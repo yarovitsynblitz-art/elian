@@ -114,3 +114,22 @@ cd ../.. && node scripts/smoke/live-smoke.mjs
 node scripts/e2e/run-e2e.mjs
 npm run lint && npm run build
 ```
+
+## Установка из GitHub (проверено)
+
+Публичный репозиторий: https://github.com/yarovitsynblitz-art/elian (релиз `v1.0.0` с архивом и `.sha256`).
+
+| Проверка | Результат |
+|---|---|
+| `git clone --depth 1` без авторизации | ок |
+| `bootstrap.sh` из клона в чистом `$HOME` | EXIT=0, 9/9 шагов, ~135 с |
+| `npm ci` с компиляцией `better-sqlite3-multiple-ciphers` из исходников | ок (после фикса `npm_config_nodedir`) |
+| `health` после установки | `{"status":"ok","database":"ok","encryptionAtRest":true}` |
+| скачивание архива из релиза + сверка `.sha256` | ок, 696 541 байт |
+
+Найдено и исправлено в этом прогоне:
+- **`node-gyp` тянул заголовки Node из интернета** → на Termux это лишняя точка отказа. Теперь при наличии
+  `$PREFIX/include/node` выставляется `npm_config_nodedir`, сборка идёт по локальным заголовкам.
+- **ошибка `npm ci` не показывала причину** (вывод уходил в `tail -5`) → теперь лог пишется в
+  `~/.elian/logs/deps.log`, при сбое печатаются последние 25 строк и подсказка `pkg install -y python make clang`,
+  плюс один автоматический повтор.

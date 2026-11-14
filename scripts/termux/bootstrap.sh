@@ -103,13 +103,29 @@ LOCK_HASH="$( (sha256sum package-lock.json 2>/dev/null || sha256sum package.json
 if [[ -d node_modules ]] && [[ -f "$DEPS_HASH_FILE" ]] && [[ "$(cat "$DEPS_HASH_FILE")" == "$LOCK_HASH" ]]; then
   log "зависимости уже установлены под этот lock-файл — пропускаю npm ci"
 else
-  if [[ -f package-lock.json ]]; then
-    log "npm ci (по lock-файлу)"
-    npm ci --no-audit --no-fund 2>&1 | tail -5
-  else
-    log "npm install"
-    npm install --no-audit --no-fund 2>&1 | tail -5
+  # node-gyp на Termux не должен тянуть заголовки Node из интернета: они лежат в $PREFIX/include/node.
+  if [[ -z "${npm_config_nodedir:-}" ]] && [[ -n "${PREFIX:-}" ]] && [[ -d "$PREFIX/include/node" ]]; then
+    export npm_config_nodedir="$PREFIX"
+    log "node-gyp: локальные заголовки Node ($PREFIX/include/node)"
   fi
+
+  deps_install() {
+    if [[ -f package-lock.json ]]; then
+      npm_config_update_notifier=false npm ci --no-audit --no-fund >"$ELIAN_LOG_DIR/deps.log" 2>&1
+    else
+      npm_config_update_notifier=false npm install --no-audit --no-fund >"$ELIAN_LOG_DIR/deps.log" 2>&1
+    fi
+  }
+  log "npm ci (по lock-файлу, лог: $ELIAN_LOG_DIR/deps.log)"
+  if ! deps_install; then
+    warn "установка зависимостей не удалась — повторяю через 3 секунды"
+    sleep 3
+    if ! deps_install; then
+      tail -25 "$ELIAN_LOG_DIR/deps.log" >&2 || true
+      die "не удалось установить зависимости. На Termux: pkg install -y python make clang nodejs-lts, затем повторите bootstrap"
+    fi
+  fi
+  log "зависимости установлены"
   printf '%s\n' "$LOCK_HASH" > "$DEPS_HASH_FILE"
   chmod 600 "$DEPS_HASH_FILE"
 fi

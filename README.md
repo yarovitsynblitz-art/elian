@@ -32,10 +32,10 @@ Android + Termux  ──►  Fastify + Socket.IO (127.0.0.1:3000)
 
 ```bash
 # прямо из git
-cd $HOME && pkg install -y git && git clone --depth 1 https://github.com/<ЛОГИН>/elian.git elian-src && bash elian-src/scripts/termux/bootstrap.sh
+cd $HOME && pkg install -y git && git clone --depth 1 https://github.com/yarovitsynblitz-art/elian.git elian-src && bash elian-src/scripts/termux/bootstrap.sh
 
 # или из приложенного к релизу архива (с проверкой контрольной суммы)
-cd $HOME && pkg install -y curl tar && curl -fsSLO https://github.com/<ЛОГИН>/elian/releases/download/v1.0.0/elian-1.0.0.tar.gz && echo "$(curl -fsSL https://github.com/<ЛОГИН>/elian/releases/download/v1.0.0/elian-1.0.0.tar.gz.sha256)  elian-1.0.0.tar.gz" | sha256sum -c - && tar xzf elian-1.0.0.tar.gz && bash elian-1.0.0/scripts/termux/bootstrap.sh
+cd $HOME && pkg install -y curl tar && curl -fsSLO https://github.com/yarovitsynblitz-art/elian/releases/download/v1.0.0/elian-1.0.0.tar.gz && echo "$(curl -fsSL https://github.com/yarovitsynblitz-art/elian/releases/download/v1.0.0/elian-1.0.0.tar.gz.sha256)  elian-1.0.0.tar.gz" | sha256sum -c - && tar xzf elian-1.0.0.tar.gz && bash elian-1.0.0/scripts/termux/bootstrap.sh
 ```
 
 > Принципиально: **никаких `curl | bash`** — сначала скачивание и проверка контрольной суммы, потом запуск скрипта.
