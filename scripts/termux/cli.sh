@@ -48,9 +48,26 @@ case "$CMD" in
       if [[ "${ELIAN_TUNNEL_MODE:-quick}" == "quick" ]]; then
         echo "(временный адрес *.trycloudflare.com: меняется после перезапуска и пробуждения телефона; постоянный — bash scripts/cloudflare/setup-named-tunnel.sh)" >&2
       fi
+      # На телефоне удобнее сразу вставить ссылку в браузер, а не перепечатывать её.
+      if command -v termux-clipboard-set >/dev/null 2>&1; then
+        termux-clipboard-set "$(cat "$URL_FILE")" >/dev/null 2>&1 && echo "(ссылка скопирована в буфер обмена)" >&2
+      fi
     else
       echo "публичный адрес ещё не определён — запустите: elian start, затем: elian logs tunnel 20" >&2
       exit 1
+    fi
+    ;;
+  open|открыть)
+    ELIAN_HOME="${ELIAN_HOME:-$HOME/.elian}"
+    URL="$(cat "$ELIAN_HOME/public-url.txt" 2>/dev/null || true)"
+    [[ -n "$URL" ]] || { echo "публичный адрес ещё не определён — elian start" >&2; exit 1; }
+    echo "$URL"
+    if command -v termux-open-url >/dev/null 2>&1; then
+      termux-open-url "$URL" >/dev/null 2>&1 && echo "(открыл в браузере)" >&2
+    elif command -v xdg-open >/dev/null 2>&1 && xdg-open "$URL" >/dev/null 2>&1; then
+      echo "(открыл в браузере)" >&2
+    else
+      echo "(открыть нечем: pkg install -y termux-tools — или скопируйте ссылку выше)" >&2
     fi
     ;;
   qr|код)
@@ -127,7 +144,8 @@ EOT
   elian stop           остановить
   elian restart        перезапустить
   elian status         состояние, публичный адрес, ресурсы
-  elian url            только публичная ссылка (+ предупреждение, если туннель упал)
+  elian url            публичная ссылка (и копирует её в буфер обмена на телефоне)
+  elian open           открыть публичную ссылку в браузере телефона
   elian tunnel [--live] диагностика туннеля: токен, домен, DNS, подключение (--live — поднять на 25 с)
   elian qr             QR-код со ссылкой (pkg install qrencode) — показать другу с телефона
   elian logs [server|tunnel] [N]   последние N строк лога (по умолчанию 80)
