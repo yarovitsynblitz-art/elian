@@ -5,6 +5,8 @@ import { get, all, run } from '../db/index.js';
 import { paths } from '../config/env.js';
 import { decryptAll, encryptFileToFile } from '../lib/media-crypto.js';
 import { errors } from '../lib/errors.js';
+import { sniffMimeFromFile, mimeFromFileName } from '../lib/mime-sniff.js';
+import { warn } from '../lib/log.js';
 import { now } from '../lib/time.js';
 import { isMember } from './chats.js';
 
@@ -40,7 +42,26 @@ const ALLOWED_MIME = new Set([
 ]);
 
 export function isAllowedMime(mime: string): boolean {
+  if (!mime || mime === 'application/octet-stream') return false;
   return ALLOWED_MIME.has(mime) || mime.startsWith('image/') || mime.startsWith('audio/') || mime.startsWith('video/');
+}
+
+/**
+ * Итоговый MIME файла: доверяем клиенту только если тип осмысленный и разрешённый,
+ * иначе восстанавливаем по содержимому, и лишь затем — по расширению.
+ */
+export async function resolveMime(
+  declared: string | null | undefined,
+  filePath: string,
+  fileName: string | null,
+): Promise<string> {
+  const clean = (declared ?? '').split(';')[0]!.trim().toLowerCase();
+  if (isAllowedMime(clean)) return clean;
+  const sniffed = await sniffMimeFromFile(filePath);
+  if (sniffed && isAllowedMime(sniffed)) return sniffed;
+  const byName = mimeFromFileName(fileName);
+  if (byName && isAllowedMime(byName)) return byName;
+  return clean || 'application/octet-stream';
 }
 
 function detectKind(mime: string, requested?: string): string {
@@ -69,7 +90,10 @@ export async function storeUpload(input: StoreUploadInput): Promise<MediaRow> {
   const stat = await fs.promises.stat(input.tempPath);
   if (stat.size === 0) throw errors.badRequest('Пустой файл');
   if (stat.size > input.maxBytes) throw errors.badRequest('Файл больше допустимого размера');
-  if (!isAllowedMime(input.mimeType)) throw errors.badRequest('Этот тип файла не поддерживается');
+  if (!isAllowedMime(input.mimeType)) {
+    warn('upload_rejected_mime', { mimeType: input.mimeType, size: stat.size, fileName: input.fileName ?? null });
+    throw errors.badRequest('Этот тип файла не поддерживается');
+  }
   const id = crypto.randomUUID();
   const ext = mimeExtension(input.mimeType);
   const safeName = `${id}.eln${ext ? `.${ext}` : ''}`;
@@ -100,6 +124,9 @@ function mimeExtension(mime: string): string {
     'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif',
     'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov',
     'audio/mpeg': 'mp3', 'audio/ogg': 'ogg', 'audio/webm': 'webm', 'audio/mp4': 'm4a', 'audio/wav': 'wav', 'audio/aac': 'aac',
+    'image/heic': 'heic', 'image/heif': 'heif', 'image/bmp': 'bmp',
+    'video/3gpp': '3gp', 'video/3gpp2': '3g2', 'video/x-matroska': 'mkv', 'video/x-m4v': 'm4v', 'video/x-msvideo': 'avi',
+    'audio/opus': 'opus', 'audio/flac': 'flac',
     'application/pdf': 'pdf', 'application/zip': 'zip', 'text/plain': 'txt',
   };
   return map[mime] ?? 'bin';

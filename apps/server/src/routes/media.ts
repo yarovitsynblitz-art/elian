@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { env } from '../config/env.js';
 import { errors } from '../lib/errors.js';
 import { requireAuth } from '../auth/sessions.js';
-import { canAccessMedia, deleteMedia, getMedia, readWhole, readThumb, storeUpload } from '../services/media.js';
+import { canAccessMedia, deleteMedia, getMedia, readWhole, readThumb, resolveMime, storeUpload } from '../services/media.js';
 import { decryptRange } from '../lib/media-crypto.js';
 import { enforce, RULES } from '../lib/rate-limit.js';
 import { audit } from '../lib/audit.js';
@@ -66,7 +66,7 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
       const media = await storeUpload({
         ownerId: auth.userId,
         tempPath: part.tempPath,
-        mimeType: part.mimeType,
+        mimeType: await resolveMime(part.mimeType, part.tempPath, part.fileName),
         fileName: part.fileName,
         kind: part.fields.kind,
         width: fieldNumber(part.fields, 'width'),

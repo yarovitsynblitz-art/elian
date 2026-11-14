@@ -71,7 +71,9 @@ case "$CMD" in
   restore)      bash "$ROOT_DIR/scripts/backup/restore.sh" "$@" ;;
   update)
     cd "$ROOT_DIR"
-    git pull --ff-only
+    # Клон ставится с --depth 1, поэтому обычный pull иногда не может свести истории:
+    # тянем последний main и сбрасываем рабочую копию на него.
+    git fetch --depth 1 origin main && git reset --hard origin/main || git pull --ff-only
     bash "$S/bootstrap.sh"
     ;;
   doctor)

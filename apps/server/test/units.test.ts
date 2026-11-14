@@ -145,3 +145,28 @@ describe('Шифрование медиа (AES-256-GCM по чанкам)', () =
     expect((await decryptAll(target, data.length)).equals(data)).toBe(true);
   });
 });
+
+describe('Определение MIME по содержимому', () => {
+  const head = (bytes: number[]) => Buffer.from([...bytes, ...new Array(64).fill(0)]).subarray(0, 64);
+
+  it('опознаёт JPEG, PNG, GIF, WebP', async () => {
+    const { sniffMime } = await import('../src/lib/mime-sniff.js');
+    expect(sniffMime(head([0xff, 0xd8, 0xff, 0xe0]))).toBe('image/jpeg');
+    expect(sniffMime(Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(60)]))).toBe('image/png');
+    expect(sniffMime(Buffer.concat([Buffer.from('GIF89a'), Buffer.alloc(60)]))).toBe('image/gif');
+    expect(sniffMime(Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBP'), Buffer.alloc(56)]))).toBe('image/webp');
+  });
+
+  it('опознаёт MP4/HEIC по бренду в ftyp', async () => {
+    const { sniffMime } = await import('../src/lib/mime-sniff.js');
+    expect(sniffMime(Buffer.concat([Buffer.alloc(4), Buffer.from('ftypisom'), Buffer.alloc(56)]))).toBe('video/mp4');
+    expect(sniffMime(Buffer.concat([Buffer.alloc(4), Buffer.from('ftypheic'), Buffer.alloc(56)]))).toBe('image/heic');
+  });
+
+  it('возвращает MIME по расширению, если содержимое не опознано', async () => {
+    const { mimeFromFileName } = await import('../src/lib/mime-sniff.js');
+    expect(mimeFromFileName('IMG_0001.JPG')).toBe('image/jpeg');
+    expect(mimeFromFileName('clip.mov')).toBe('video/quicktime');
+    expect(mimeFromFileName('без-расширения')).toBeNull();
+  });
+});

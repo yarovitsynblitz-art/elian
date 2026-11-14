@@ -19,19 +19,35 @@ export function StoriesBar() {
   const toast = useAppStore((state) => state.toast);
   const [viewing, setViewing] = useState<{ group: StoryGroup; index: number } | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [uploading, setUploading] = useState<{ percent: number; name: string } | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Публикация фото/видео. Ошибки показываем прямо в окне (а не только тостом),
+   * окно закрываем лишь после успеха — иначе выглядело так, будто «ничего не произошло».
+   */
   async function publish(file: File, kind: 'photo' | 'video') {
+    setUploadError(null);
+    setUploading({ percent: 0, name: file.name || 'файл' });
     const formData = new FormData();
     formData.append('file', file);
     formData.append('kind', kind);
     try {
-      const uploaded = await uploadWithProgress<{ media: { id: string } }>('/media/upload', formData);
+      const uploaded = await uploadWithProgress<{ media: { id: string } }>('/media/upload', formData, (percent) =>
+        setUploading({ percent, name: file.name || 'файл' }),
+      );
+      setUploading({ percent: 100, name: file.name || 'файл' });
       await api.post('/stories', { kind, mediaId: uploaded.media.id, privacy: 'contacts', duration: 5 });
       toast('История опубликована на 24 часа', 'success');
+      setComposerOpen(false);
       await stories.refetch();
     } catch (error) {
-      toast((error as Error).message, 'error');
+      const message = (error as Error).message || 'Не удалось опубликовать';
+      setUploadError(message);
+      toast(message, 'error');
+    } finally {
+      setUploading(null);
     }
   }
 
@@ -73,13 +89,30 @@ export function StoriesBar() {
         className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0];
+          // Сбрасываем значение, иначе повторный выбор того же файла не вызовет onChange.
+          event.target.value = '';
           if (file) void publish(file, file.type.startsWith('video/') ? 'video' : 'photo');
-          setComposerOpen(false);
         }}
       />
       <Modal open={composerOpen} onClose={() => setComposerOpen(false)} title="Новая история">
         <div className="space-y-3">
-          <Button className="w-full" icon="image" onClick={() => fileRef.current?.click()}>Фото или видео</Button>
+          <Button className="w-full" icon="image" disabled={Boolean(uploading)} onClick={() => fileRef.current?.click()}>
+            {uploading ? 'Загрузка…' : 'Фото или видео'}
+          </Button>
+          {uploading ? (
+            <div className="space-y-1" role="status" aria-live="polite">
+              <div className="h-1.5 overflow-hidden rounded-full bg-surface-hover">
+                <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${uploading.percent}%` }} />
+              </div>
+              <p className="truncate text-[11px] text-ink-faint">{uploading.name} · {uploading.percent}%</p>
+            </div>
+          ) : null}
+          {uploadError ? (
+            <div className="rounded-xl2 border border-danger/40 bg-danger/10 p-2 text-[12px] text-ink" role="alert">
+              {uploadError}
+              <button className="ml-1 underline" onClick={() => fileRef.current?.click()}>Повторить</button>
+            </div>
+          ) : null}
           <StoryTextComposer onDone={() => { setComposerOpen(false); void stories.refetch(); }} />
           <p className="text-[11px] text-ink-faint">Приватность: контакты. Изменить можно в настройках приватности.</p>
         </div>

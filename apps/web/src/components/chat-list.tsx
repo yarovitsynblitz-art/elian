@@ -69,6 +69,8 @@ export function ChatList({
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [multiSelect, setMultiSelect] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const me = useAppStore((state) => state.user);
 
   const folders = foldersQuery.data ?? [];
 
@@ -124,7 +126,47 @@ export function ChatList({
     <div className="flex h-full flex-col">
       <header className="safe-top px-3 pt-3">
         <div className="flex items-center justify-between gap-2 px-1 pb-2">
-          <h1 className="text-lg font-semibold">{archived ? t('nav.archive') : t('nav.chats')}</h1>
+          <div className="flex items-center gap-2">
+            {/* На телефоне бокового меню нет — вход в настройки и разделы через аватар. */}
+            <div className="relative lg:hidden">
+              <button
+                className="flex h-9 w-9 items-center justify-center rounded-full"
+                onClick={() => setMobileMenu((value) => !value)}
+                aria-label="Меню"
+                aria-expanded={mobileMenu}
+              >
+                <Avatar name={me?.displayName ?? '?'} src={me?.avatarUrl ?? null} size={34} />
+              </button>
+              {mobileMenu ? (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setMobileMenu(false)} />
+                  <div className="absolute left-0 top-11 z-40 w-56 overflow-hidden rounded-xl2 border border-line bg-surface-raised py-1 shadow-xl">
+                    {[
+                      { label: t('nav.settings'), icon: 'settings', to: '/settings' },
+                      { label: t('nav.contacts'), icon: 'users', to: '/contacts' },
+                      { label: 'Истории', icon: 'story', to: '/stories' },
+                      { label: t('nav.archive'), icon: 'archive', to: '/archive' },
+                    ].map((item) => (
+                      <button
+                        key={item.to}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-hover"
+                        onClick={() => { setMobileMenu(false); navigate(item.to); }}
+                      >
+                        <Icon name={item.icon as never} size={16} />{item.label}
+                      </button>
+                    ))}
+                    <button
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-hover"
+                      onClick={() => { setMobileMenu(false); onOpenSearch(); }}
+                    >
+                      <Icon name="search" size={16} />{t('nav.search')}
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+            <h1 className="text-lg font-semibold">{archived ? t('nav.archive') : t('nav.chats')}</h1>
+          </div>
           <div className="flex items-center gap-1">
             <button className="icon-btn" onClick={onOpenSearch} aria-label={t('nav.search')}><Icon name="search" /></button>
             <button className="icon-btn" onClick={onNewChat} aria-label={t('chats.newChat')}><Icon name="plus" /></button>
