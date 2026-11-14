@@ -21,6 +21,8 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$ROOT_DIR"
 
 step "1/9 Проверка окружения"
+# Самовосстановление прав: при распаковке архива или переносе с Windows/Android бит x может потеряться.
+find "$ROOT_DIR/scripts" -name "*.sh" -type f -exec chmod +x {} + 2>/dev/null || true
 if is_termux; then
   log "Termux обнаружен ($(uname -m))"
   for pkg in nodejs-lts git tmux curl openssl tar; do
@@ -151,13 +153,13 @@ fi
 ok "база на месте и зашифрована"
 
 step "8/9 Cloudflare Tunnel"
-"$SCRIPT_DIR/../cloudflare/install-cloudflared.sh" || die "не удалось установить cloudflared"
+bash "$SCRIPT_DIR/../cloudflare/install-cloudflared.sh" || die "не удалось установить cloudflared"
 case "$ELIAN_TUNNEL_MODE" in
   none)
     warn "туннель отключён (ELIAN_TUNNEL_MODE=none) — сервер будет доступен только локально"
     ;;
   named)
-    "$SCRIPT_DIR/../cloudflare/setup-named-tunnel.sh" || die "не удалось настроить именованный туннель"
+    bash "$SCRIPT_DIR/../cloudflare/setup-named-tunnel.sh" || die "не удалось настроить именованный туннель"
     ;;
   quick|*)
     log "будет использован Quick Tunnel (временный адрес *.trycloudflare.com)"
@@ -165,7 +167,7 @@ case "$ELIAN_TUNNEL_MODE" in
 esac
 
 step "9/9 Запуск сервера и туннеля"
-"$SCRIPT_DIR/start.sh"
+bash "$SCRIPT_DIR/start.sh"
 
 PUBLIC_URL="$(cat "$ELIAN_HOME/public-url.txt" 2>/dev/null || true)"
 if [[ -n "$PUBLIC_URL" ]]; then

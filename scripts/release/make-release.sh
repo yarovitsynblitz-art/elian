@@ -8,6 +8,8 @@ OUT_DIR="${OUT_DIR:-$ROOT_DIR/dist-release}"
 mkdir -p "$OUT_DIR"
 
 BASE="$(basename "$ROOT_DIR")"
+# Все скрипты должны быть исполняемыми внутри архива (Termux после распаковки).
+find "$ROOT_DIR/scripts" -name "*.sh" -type f -exec chmod 755 {} + 2>/dev/null || true
 cd "$(dirname "$ROOT_DIR")"
 tar --transform "s,^${BASE},${NAME}," --exclude='node_modules' --exclude='.git' --exclude='*/dist' --exclude='.elian' --exclude='data' \
     --exclude='*.elnb' --exclude='test-results' --exclude='playwright-report' \
