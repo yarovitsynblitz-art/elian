@@ -94,6 +94,13 @@ tunnel_running() {
   [[ -f "$TUNNEL_PID_FILE" ]] && kill -0 "$(cat "$TUNNEL_PID_FILE")" 2>/dev/null
 }
 
+# Уведомление в шторку Android (Termux:API). На ПК и без termux-api — молча ничего.
+notify() {
+  local title="${1:-Элиан}" body="${2:-}"
+  have termux-notification || return 0
+  termux-notification --title "$title" --content "$body" --priority high >/dev/null 2>&1 || true
+}
+
 nohup_mode() { ! have tmux; }
 
 health_ok() {

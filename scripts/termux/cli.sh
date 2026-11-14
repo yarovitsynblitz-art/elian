@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # elian — короткие команды для повседневного управления Элианом на телефоне.
-#   elian start | stop | restart | status | url | logs [server|tunnel] [N] | console | backup | update | doctor | help
+#   elian start | stop | restart | status | url | qr | logs [server|tunnel] [N] | console | backup | update | doctor | help
 set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,10 +38,31 @@ case "$CMD" in
   status|st)    bash "$S/status.sh" "$@" ;;
   logs|log)     bash "$S/logs.sh" "$@" ;;
   url|addr)
-    if [[ -f "$HOME/.elian/public-url.txt" ]]; then
-      cat "$HOME/.elian/public-url.txt"
+    ELIAN_HOME="${ELIAN_HOME:-$HOME/.elian}"
+    URL_FILE="$ELIAN_HOME/public-url.txt"
+    if [[ -s "$URL_FILE" ]]; then
+      cat "$URL_FILE"
+      if [[ ! -f "$ELIAN_HOME/tunnel.pid" ]] || ! kill -0 "$(cat "$ELIAN_HOME/tunnel.pid" 2>/dev/null)" 2>/dev/null; then
+        echo "(!) процесс туннеля не найден — ссылка может не открываться (Error 1033). Запустите: elian start" >&2
+      fi
+      if [[ "${ELIAN_TUNNEL_MODE:-quick}" == "quick" ]]; then
+        echo "(временный адрес *.trycloudflare.com: меняется после перезапуска и пробуждения телефона; постоянный — bash scripts/cloudflare/setup-named-tunnel.sh)" >&2
+      fi
     else
-      echo "публичный адрес ещё не определён — запустите: elian start, затем: elian logs tunnel 20"
+      echo "публичный адрес ещё не определён — запустите: elian start, затем: elian logs tunnel 20" >&2
+      exit 1
+    fi
+    ;;
+  qr|код)
+    ELIAN_HOME="${ELIAN_HOME:-$HOME/.elian}"
+    URL="$(cat "$ELIAN_HOME/public-url.txt" 2>/dev/null || true)"
+    [[ -n "$URL" ]] || { echo "публичный адрес ещё не определён — elian start" >&2; exit 1; }
+    if have qrencode 2>/dev/null || command -v qrencode >/dev/null 2>&1; then
+      printf '%s' "$URL" | qrencode -t ANSIUTF8 -m 2
+      printf '\n%s\n' "$URL"
+    else
+      printf '%s\n\n' "$URL"
+      echo "QR-код: pkg install -y qrencode && elian qr" >&2
     fi
     ;;
   console|owner)
@@ -103,7 +124,8 @@ EOT
   elian stop           остановить
   elian restart        перезапустить
   elian status         состояние, публичный адрес, ресурсы
-  elian url            только публичная ссылка
+  elian url            только публичная ссылка (+ предупреждение, если туннель упал)
+  elian qr             QR-код со ссылкой (pkg install qrencode) — показать другу с телефона
   elian logs [server|tunnel] [N]   последние N строк лога (по умолчанию 80)
   elian console        консоль владельца (подтверждение входов: y / n)
   elian pending        кто ждёт подтверждения (код, логин, тип)

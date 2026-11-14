@@ -24,6 +24,20 @@ fi
 
 URL="$(cat "$ELIAN_HOME/public-url.txt" 2>/dev/null || true)"
 printf '  публичный адрес: %s\n' "${URL:-—}"
+# Туннель живёт отдельным процессом: если он упал, ссылка превращается в «Error 1033».
+if tunnel_running; then
+  printf '  туннель: запущен (%s)\n' "${ELIAN_TUNNEL_MODE:-quick}"
+else
+  warn "туннель: не запущен — внешняя ссылка не работает (Error 1033). Запустите: elian start"
+fi
+HIST_FILE="$ELIAN_HOME/public-url.history"
+if [[ -s "$HIST_FILE" ]]; then
+  CHANGES="$(wc -l < "$HIST_FILE" | tr -d ' ')"
+  if [[ "${CHANGES}" -gt 1 ]]; then
+    printf '  адрес менялся: %s раз(а) — старые ссылки не работают, актуальная выше\n' "$CHANGES"
+  fi
+  printf '  адрес получен: %s\n' "$(tail -1 "$HIST_FILE" | cut -c1-16)"
+fi
 
 if [[ -f "$ELIAN_DATA_DIR/elian.db" ]]; then
   printf '  база: %s (%s)\n' "$ELIAN_DATA_DIR/elian.db" "$(du -h "$ELIAN_DATA_DIR/elian.db" | cut -f1)"

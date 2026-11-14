@@ -1,5 +1,6 @@
 # Элиан на Android в Termux
 
+
 ## 1. Что понадобится
 
 - Android 9+ (лучше 11+), Termux **из F-Droid** (версия из Google Play устарела и не поддерживается).
@@ -81,6 +82,20 @@ bash scripts/backup/restore.sh <файл.elnb>   # восстановить (с�
 ```
 Парольная фраза по умолчанию лежит в `~/.elian/secrets/backup-passphrase.key`. Если хотите защиту от кражи
 телефона — перенесите эту фразу на бумагу/менеджер паролей и удалите файл с устройства.
+
+## Ссылка перестала открываться (Error 1033)
+
+`Error 1033 · Cloudflare Tunnel error` = в закладке старый адрес Quick Tunnel. Проверьте:
+
+```bash
+elian url        # актуальный адрес
+elian status     # жив ли туннель, когда получен адрес, менялся ли он
+elian start      # поднять, если туннель не запущен
+```
+
+Адрес `*.trycloudflare.com` меняется при каждом перезапуске и при пробуждении телефона.
+Если нужна постоянная ссылка — именованный туннель: `bash scripts/cloudflare/setup-named-tunnel.sh`
+и `ELIAN_TUNNEL_MODE=named` в `~/.elian/elian.env` (подробно — docs/CLOUDFLARE.md).
 
 ## 8. Диагностика
 
