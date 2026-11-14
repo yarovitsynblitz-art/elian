@@ -155,6 +155,18 @@ export async function storyRoutes(app: FastifyInstance): Promise<void> {
       'SELECT id, kind, text, media_id, created_at, expires_at FROM stories WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100',
       [auth.userId],
     );
-    reply.send({ stories: rows });
+    reply.send({
+      stories: rows.map((row) => ({
+        id: row.id,
+        kind: row.kind,
+        text: row.text,
+        mediaId: row.media_id,
+        url: row.media_id ? `/api/v1/media/${row.media_id}/content` : null,
+        thumbUrl: row.media_id ? `/api/v1/media/${row.media_id}/thumbnail` : null,
+        createdAt: row.created_at,
+        expiresAt: row.expires_at,
+        viewCount: get<{ c: number }>('SELECT count(*) AS c FROM story_views WHERE story_id = ?', [row.id])?.c ?? 0,
+      })),
+    });
   });
 }

@@ -165,17 +165,29 @@ export async function buildApp(options: { serveStatic?: boolean; logger?: boolea
     await app.register(fastifyStatic, {
       root: paths.webDist,
       prefix: '/',
-      wildcard: false,
+      // wildcard: файлы отдаются с диска, а не из снимка таблицы маршрутов на старте —
+      // иначе после пересборки (новые хэши в именах чанков) сервер отдаёт 404 на свежие ассеты.
+      wildcard: true,
       setHeaders(res, filePath) {
         if (filePath.includes(`${path.sep}assets${path.sep}`)) res.setHeader('cache-control', 'public, max-age=31536000, immutable');
+        if (filePath.endsWith('index.html')) res.setHeader('cache-control', 'no-cache, must-revalidate');
         if (filePath.endsWith('sw.js') || filePath.endsWith('manifest.webmanifest')) res.setHeader('cache-control', 'no-cache');
       },
     });
     app.setNotFoundHandler((req, reply) => {
-      if (req.url.startsWith('/api/') || req.url.startsWith('/socket.io')) {
+      const url = req.url.split('?')[0] ?? '';
+      if (url.startsWith('/api/') || url.startsWith('/socket.io')) {
         reply.code(404).send({ error: 'not_found', message: 'Маршрут не найден', requestId: req.id });
         return;
       }
+      // Ассеты и файлы с расширением не подменяем на index.html: иначе браузер получает
+      // HTML вместо JS (MIME-ошибка) и приложение молча показывает пустой экран.
+      const looksLikeFile = /\.[a-z0-9]{2,8}$/i.test(url);
+      if (looksLikeFile) {
+        reply.code(404).type('text/plain; charset=utf-8').send('Not found');
+        return;
+      }
+      reply.header('cache-control', 'no-cache, must-revalidate');
       reply.header('content-type', 'text/html; charset=utf-8');
       reply.send(fs.createReadStream(path.join(paths.webDist, 'index.html')));
     });

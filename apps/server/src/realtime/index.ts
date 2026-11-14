@@ -16,6 +16,18 @@ import { verifyApprovalSecretFor } from '../auth/pending.js';
 
 let ioRef: SocketServer<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> | null = null;
 
+
+/** localhost, 127.0.0.1 и адреса домашней сети (192.168.x, 10.x, 172.16-31.x, *.local). */
+function isLocalOrigin(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname === '::1' || hostname === '[::1]') return true;
+  if (hostname.endsWith('.local') || hostname.endsWith('.lan')) return true;
+  if (/^127\./.test(hostname)) return true;
+  if (/^10\./.test(hostname)) return true;
+  if (/^192\.168\./.test(hostname)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) return true;
+  return false;
+}
+
 export function getIo() {
   return ioRef;
 }
@@ -122,14 +134,18 @@ export function attachRealtime(app: FastifyInstance) {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
         if (env.allowedOrigins.includes(origin)) return callback(null, true);
+        let hostname = '';
         try {
-          const host = new URL(origin).hostname;
-          if (host.endsWith('trycloudflare.com')) return callback(null, true);
-        } catch { /* ignore */ }
-        const publicHost = env.publicUrl ? new URL(env.publicUrl).host : '';
-        try {
-          if (publicHost && new URL(origin).host === publicHost) return callback(null, true);
-        } catch { /* ignore */ }
+          hostname = new URL(origin).hostname;
+        } catch {
+          return callback(new Error('origin_not_allowed'));
+        }
+        // Тот же хост, что и у публичного адреса, или localhost/IP из домашней сети:
+        // так realtime работает и без туннеля (телефон в той же Wi-Fi).
+        const publicHost = env.publicUrl ? new URL(env.publicUrl).hostname : '';
+        if (publicHost && hostname === publicHost) return callback(null, true);
+        if (isLocalOrigin(hostname)) return callback(null, true);
+        if (hostname.endsWith('.trycloudflare.com')) return callback(null, true);
         callback(new Error('origin_not_allowed'));
       },
       credentials: true,

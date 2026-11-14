@@ -37,6 +37,17 @@ export function useConfig() {
   });
 }
 
+const LAST_USER_KEY = 'elian.lastUser';
+
+function readLastUser(): SelfUser | null {
+  try {
+    const raw = localStorage.getItem(LAST_USER_KEY);
+    return raw ? (JSON.parse(raw) as SelfUser) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useMe() {
   const setUser = useAppStore((state) => state.setUser);
   const status = useAppStore((state) => state.status);
@@ -46,9 +57,26 @@ export function useMe() {
     queryFn: async () => {
       try {
         const result = await api.get<{ user: SelfUser }>('/auth/me');
+        try {
+          localStorage.setItem(LAST_USER_KEY, JSON.stringify(result.user));
+        } catch {
+          /* приватный режим */
+        }
         return result.user;
       } catch (error) {
-        if (error instanceof ApiError && error.status === 401) return null;
+        // 401 — сессия действительно недействительна.
+        if (error instanceof ApiError && error.status === 401) {
+          try {
+            localStorage.removeItem(LAST_USER_KEY);
+          } catch {
+            /* игнорируем */
+          }
+          return null;
+        }
+        // Нет сети / сервер недоступен: не выбрасываем пользователя на экран входа,
+        // а работаем от последнего известного профиля (кэш чатов и сообщений — локальный).
+        const cached = readLastUser();
+        if (cached) return cached;
         throw error;
       }
     },

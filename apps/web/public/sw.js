@@ -1,11 +1,23 @@
 /* Service worker Элиана: офлайн-оболочка + кэш ассетов. API и медиа не кэшируются надолго. */
-const VERSION = 'elian-v1';
-const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+const VERSION = 'elian-v2';
+const SHELL = ['/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+
+/** Кладём в кэш index.html и все хэшированные чанки, на которые он ссылается.
+ *  Без этого офлайн-оболочка открывается, но без JS — экран остаётся пустым. */
+async function precacheShell() {
+  const cache = await caches.open(VERSION);
+  await Promise.all(SHELL.map((url) => cache.add(url).catch(() => undefined)));
+  const response = await fetch('/', { cache: 'reload' }).catch(() => null);
+  if (!response || !response.ok) return;
+  const html = await response.clone().text();
+  await cache.put('/', response.clone());
+  await cache.put('/index.html', response.clone());
+  const assets = Array.from(html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g), (match) => match[1]);
+  await Promise.all(assets.map((url) => cache.add(url).catch(() => undefined)));
+}
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(VERSION).then((cache) => cache.addAll(SHELL).catch(() => undefined)).then(() => self.skipWaiting()),
-  );
+  event.waitUntil(precacheShell().then(() => self.skipWaiting()).catch(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
@@ -26,7 +38,16 @@ self.addEventListener('fetch', (event) => {
   // Навигация: network-first, офлайн — оболочка.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/index.html').then((res) => res || new Response('Офлайн', { status: 503 }))),
+      fetch(request)
+        .then((response) => {
+          // Обновляем оболочку и чанки в фоне, чтобы следующий офлайн-запуск работал.
+          if (response.ok) event.waitUntil(precacheShell().catch(() => undefined));
+          return response;
+        })
+        .catch(async () => {
+          const cached = (await caches.match('/index.html')) || (await caches.match('/'));
+          return cached || new Response('Офлайн: страница не закэширована', { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+        }),
     );
     return;
   }

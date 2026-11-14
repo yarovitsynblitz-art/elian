@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import type { ChatSummary, Message, PublicUser } from '@elian/shared';
 import { api } from '../lib/api';
 import { useAppStore } from '../store/app';
-import { useChat, useChatActions, useChatMessages, useChatSearch, useTypingIndicator } from '../hooks/useElian';
+import { useChat, useChatActions, useChatMessages, useChatSearch, useChats, useTypingIndicator } from '../hooks/useElian';
 import { Avatar, Badge, Button, EmptyState, Modal, Spinner } from './ui';
 import { Icon } from './icons';
 import { MessageContent } from './message-content';
@@ -33,6 +33,7 @@ export function ChatView({ chatId, onOpenPanel }: { chatId: string; onOpenPanel:
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showInfo, setShowInfo] = useState(false);
+  const [forwardFor, setForwardFor] = useState<Message | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const search = useChatSearch(chatId, searchQuery);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -269,16 +270,7 @@ export function ChatView({ chatId, onOpenPanel }: { chatId: string; onOpenPanel:
             <ActionRow
               icon="forward"
               label={t('chat.forward')}
-              onClick={async () => {
-                try {
-                  const forward = await api.post<{ chat: ChatSummary }>('/messages/forward', { messageIds: [menuFor.id], toChatId: chatId });
-                  toast('Переслано в текущий чат', 'success');
-                  void forward;
-                } catch (error) {
-                  toast((error as Error).message, 'error');
-                }
-                setMenuFor(null);
-              }}
+              onClick={() => { setForwardFor(menuFor); setMenuFor(null); }}
             />
             <ActionRow icon="copy" label={t('chat.copy')} onClick={() => { void navigator.clipboard.writeText(menuFor.text); setMenuFor(null); toast('Скопировано', 'success'); }} />
             <ActionRow
@@ -294,6 +286,22 @@ export function ChatView({ chatId, onOpenPanel }: { chatId: string; onOpenPanel:
             />
           </div>
         ) : null}
+      </Modal>
+
+      <Modal open={Boolean(forwardFor)} onClose={() => setForwardFor(null)} title="Переслать в чат">
+        <ForwardPicker
+          excludeChatId={chatId}
+          onPick={async (targetId, targetTitle) => {
+            if (!forwardFor) return;
+            try {
+              await api.post('/messages/forward', { messageIds: [forwardFor.id], toChatId: targetId });
+              toast(`Переслано: ${targetTitle}`, 'success');
+              setForwardFor(null);
+            } catch (error) {
+              toast((error as Error).message, 'error');
+            }
+          }}
+        />
       </Modal>
 
       <Modal open={showInfo} onClose={() => setShowInfo(false)} title={chat.title}>
@@ -374,6 +382,7 @@ function MessageRow({
       id={`message-${message.id}`}
       className={clsx('group flex gap-2 px-1', outgoing ? 'justify-end' : 'justify-start', grouped ? 'mt-0.5' : 'mt-2', highlighted && 'msg-highlight rounded-xl2')}
       onDoubleClick={(event) => { event.preventDefault(); onReply(); }}
+      onContextMenu={(event) => { event.preventDefault(); onOpenMenu(); }}
     >
       {!outgoing ? (
         <div className="w-8 shrink-0">
@@ -433,7 +442,9 @@ function MessageRow({
           </div>
         ) : null}
 
-        <div className={clsx('absolute -top-3 z-10 hidden items-center gap-0.5 rounded-full border border-line bg-surface px-1 py-0.5 shadow group-hover:flex', outgoing ? 'left-0' : 'right-0')}>
+        {/* На телефоне нет hover — панель действий должна быть видна всегда, иначе
+            ответить/изменить/удалить сообщение с тача невозможно. */}
+        <div className={clsx('absolute -top-3 z-10 flex items-center gap-0.5 rounded-full border border-line bg-surface px-1 py-0.5 shadow opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100', outgoing ? 'left-0' : 'right-0')}>
           <button
             className="rounded-full p-1 text-ink-muted hover:bg-surface-hover"
             onClick={() => setShowReactions((value) => !value)}
@@ -463,6 +474,26 @@ function MessageRow({
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function ForwardPicker({ excludeChatId, onPick }: { excludeChatId: string; onPick: (chatId: string, title: string) => void }) {
+  const query = useChats(false);
+  const chats = (query.data ?? []).filter((item) => item.id !== excludeChatId && item.type !== 'channel');
+  if (query.isLoading) return <div className="flex justify-center py-4"><Spinner /></div>;
+  if (!chats.length) return <p className="py-3 text-sm text-ink-muted">Нет других чатов для пересылки.</p>;
+  return (
+    <div className="max-h-[60vh] space-y-1 overflow-y-auto">
+      {chats.map((item) => (
+        <button key={item.id} className="chat-row w-full" onClick={() => onPick(item.id, item.title)}>
+          <Avatar name={item.title} src={item.avatarUrl} size={38} seed={item.id} />
+          <span className="min-w-0 flex-1 text-left">
+            <span className="block truncate text-sm font-medium">{item.title}</span>
+            <span className="block truncate text-[11px] text-ink-muted">{item.type === 'group' ? 'группа' : 'личный чат'}</span>
+          </span>
+        </button>
+      ))}
     </div>
   );
 }

@@ -146,7 +146,8 @@ function ChatRoute({ onPanel }: { onPanel: () => void }) {
 }
 
 function ContactsPage() {
-  const query = useQuery({ queryKey: ['contacts-page'], queryFn: () => api.get<{ users: PublicUser[] }>('/contacts') });
+  const query = useQuery({ queryKey: ['contacts-page'], queryFn: () => api.get<{ contacts: PublicUser[] }>('/contacts') });
+  const contacts = query.data?.contacts ?? [];
   const navigate = useNavigate();
   return (
     <section className="min-w-0 flex-1 overflow-y-auto p-4">
@@ -155,7 +156,7 @@ function ContactsPage() {
         <h1 className="text-lg font-semibold">Контакты</h1>
       </div>
       <div className="space-y-1">
-        {(query.data?.users ?? []).map((user) => (
+        {contacts.map((user) => (
           <button
             key={user.id}
             className="chat-row"
@@ -171,7 +172,7 @@ function ContactsPage() {
             </span>
           </button>
         ))}
-        {!query.data?.users.length ? <EmptyState icon="users" title="Контактов пока нет" description="Добавляйте людей из профиля или поиска." /> : null}
+        {!contacts.length && !query.isLoading ? <EmptyState icon="users" title="Контактов пока нет" description="Добавляйте людей из профиля или поиска." /> : null}
       </div>
     </section>
   );
@@ -179,6 +180,7 @@ function ContactsPage() {
 
 function StoriesPage() {
   const query = useQuery({ queryKey: ['stories-archive'], queryFn: () => api.get<{ stories: Array<{ id: string; kind: string; url: string | null; thumbUrl: string | null; text: string | null; viewCount: number; createdAt: string }> }>('/stories/archive/list') });
+  const stories = query.data?.stories ?? [];
   return (
     <section className="min-w-0 flex-1 overflow-y-auto p-4">
       <div className="mb-3 flex items-center gap-2">
@@ -186,7 +188,7 @@ function StoriesPage() {
         <h1 className="text-lg font-semibold">Архив историй</h1>
       </div>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-        {(query.data?.stories ?? []).map((story) => (
+        {stories.map((story) => (
           <div key={story.id} className="overflow-hidden rounded-xl2 border border-line">
             {story.kind === 'text' ? (
               <div className="flex aspect-[9/16] items-center justify-center bg-brand p-3 text-center text-xs text-white">{story.text}</div>
@@ -200,7 +202,7 @@ function StoriesPage() {
           </div>
         ))}
       </div>
-      {!query.data?.stories.length ? <EmptyState icon="story" title="Архив пуст" description="Здесь остаются ваши истории после 24 часов." /> : null}
+      {!stories.length && !query.isLoading ? <EmptyState icon="story" title="Архив пуст" description="Здесь остаются ваши истории после 24 часов." /> : null}
     </section>
   );
 }

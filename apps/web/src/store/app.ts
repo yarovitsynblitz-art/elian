@@ -76,7 +76,14 @@ export const useAppStore = create<AuthSlice & UiSlice>((set, get) => ({
   status: 'loading',
   setUser: (user) => set({ user, status: user ? 'authed' : 'anon' }),
   setStatus: (status) => set({ status }),
-  logout: () => set({ user: null, status: 'anon', activeChatId: null }),
+  logout: () => {
+    try {
+      localStorage.removeItem('elian.lastUser');
+    } catch {
+      /* приватный режим */
+    }
+    set({ user: null, status: 'anon', activeChatId: null });
+  },
 
   theme: storedTheme,
   accent: storedAccent,

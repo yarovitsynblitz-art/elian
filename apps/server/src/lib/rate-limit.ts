@@ -8,8 +8,8 @@ const buckets = new Map<string, Bucket>();
 export type RateLimitRule = { limit: number; windowMs: number };
 
 export const RULES = {
-  login: { limit: 6, windowMs: 5 * 60_000 },
-  register: { limit: 5, windowMs: 15 * 60_000 },
+  login: { limit: 10, windowMs: 5 * 60_000 },
+  register: { limit: 10, windowMs: 15 * 60_000 },
   reset: { limit: 4, windowMs: 15 * 60_000 },
   pending: { limit: 240, windowMs: 60_000 },
   search: { limit: 60, windowMs: 60_000 },

@@ -31,6 +31,16 @@ function RealtimeBridge() {
   useEffect(() => {
     if (!user) return;
     const socket = connectSocket();
+    // События, отправленные пока сокет был отключён (или до его подключения), теряются.
+    // Поэтому при каждом подключении/переподключении подтягиваем список чатов —
+    // иначе новый чат появляется у получателя только после ручной перезагрузки.
+    const onConnect = () => {
+      void queryClient.invalidateQueries({ queryKey: ['chats'] });
+      void queryClient.invalidateQueries({ queryKey: ['stories'] });
+    };
+    socket.on('connect', onConnect);
+    if (socket.connected) onConnect();
+
     const onNewMessage = (payload: { message: Message; chat: ChatSummary | null }) => {
       const { message, chat } = payload;
       queryClient.setQueryData<Message[]>(['messages', message.chatId], (current = []) => {
@@ -85,6 +95,7 @@ function RealtimeBridge() {
     socket.emit('presence:ping');
     const presenceTimer = setInterval(() => socket.emit('presence:ping'), 60_000);
     return () => {
+      socket.off('connect', onConnect);
       clearInterval(presenceTimer);
       socket.off('message:new', onNewMessage);
       socket.off('message:edited', onEdited);

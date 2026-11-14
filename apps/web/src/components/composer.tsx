@@ -43,6 +43,26 @@ export function Composer({ chat, reply, edit }: { chat: ChatSummary; reply: Mess
     }
   }, [edit]);
 
+  // Черновик: восстанавливаем сохранённый текст при открытии чата и сохраняем изменения
+  // (на сервере, чтобы черновик был виден и с другого устройства).
+  const draftKey = `elian.draft.${chat.id}`;
+  useEffect(() => {
+    if (edit) return;
+    const local = localStorage.getItem(draftKey);
+    setText(chat.draftText ?? local ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.id, chat.draftText]);
+
+  useEffect(() => {
+    if (edit) return;
+    localStorage.setItem(draftKey, text);
+    const timer = setTimeout(() => {
+      void api.put(`/chats/${chat.id}/draft`, { text }).catch(() => undefined);
+    }, 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, chat.id]);
+
   useEffect(() => {
     if (!recording) return;
     const timer = setInterval(() => setRecordSeconds((value) => value + 1), 1000);
