@@ -45,7 +45,7 @@ cd $HOME && pkg install -y git && git clone --depth 1 https://github.com/yarovit
 ```
 
 Хотите контрольную сумму — положите рядом файл `elian-1.0.0.tar.gz.sha256` и добавьте перед `tar`:
-`echo "$(curl -fsSL https://github.com/yarovitsynblitz-art/elian/raw/main/elian-1.0.0.tar.gz.sha256)  elian-1.0.0.tar.gz" | sha256sum -c -`
+`curl -fsSLO .../elian-1.0.0.tar.gz.sha256 && sha256sum -c elian-1.0.0.tar.gz.sha256`
 
 ## Обновления
 

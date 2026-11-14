@@ -11,7 +11,10 @@
 ## 2. Установка одной командой
 
 ```bash
-cd $HOME && pkg install -y curl tar && curl -fsSLO <URL_АРХИВА> && echo "<SHA256>  <имя_архива>" | sha256sum -c - && tar xzf <имя_архива> && bash <каталог>/scripts/termux/bootstrap.sh
+cd $HOME && pkg install -y curl tar && curl -fsSLO <URL_АРХИВА> && curl -fsSLO <URL_АРХИВА>.sha256 && sha256sum -c <имя_архива>.sha256 && tar xzf <имя_архива> && bash <каталог>/scripts/termux/bootstrap.sh
+
+# рабочий пример (репозиторий проекта):
+cd $HOME && pkg install -y curl tar && curl -fsSLO https://github.com/yarovitsynblitz-art/elian/releases/download/v1.0.0/elian-1.0.0.tar.gz && curl -fsSLO https://github.com/yarovitsynblitz-art/elian/releases/download/v1.0.0/elian-1.0.0.tar.gz.sha256 && sha256sum -c elian-1.0.0.tar.gz.sha256 && tar xzf elian-1.0.0.tar.gz && bash elian-1.0.0/scripts/termux/bootstrap.sh
 ```
 
 Скрипт `scripts/termux/bootstrap.sh` выполняет 9 шагов и **идемпотентен**:
