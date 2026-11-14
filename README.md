@@ -28,13 +28,19 @@ Android + Termux  ──►  Fastify + Socket.IO (127.0.0.1:3000)
 
 ## Один шаг до запуска (Termux)
 
+Репозиторий публикуется один раз (см. `docs/PUBLISH.md`), после чего установка — одна строка:
+
 ```bash
-cd $HOME && pkg install -y curl tar && curl -fsSLO https://github.com/OWNER/elian/releases/download/v1.0.0/elian-1.0.0.tar.gz && echo "ВСТАВЬТЕ_СЮДА_SHA256  elian-1.0.0.tar.gz" | sha256sum -c - && tar xzf elian-1.0.0.tar.gz && bash elian-1.0.0/scripts/termux/bootstrap.sh
+# прямо из git
+cd $HOME && pkg install -y git && git clone --depth 1 https://github.com/<ЛОГИН>/elian.git elian-src && bash elian-src/scripts/termux/bootstrap.sh
+
+# или из приложенного к релизу архива (с проверкой контрольной суммы)
+cd $HOME && pkg install -y curl tar && curl -fsSLO https://github.com/<ЛОГИН>/elian/releases/download/v1.0.0/elian-1.0.0.tar.gz && echo "$(curl -fsSL https://github.com/<ЛОГИН>/elian/releases/download/v1.0.0/elian-1.0.0.tar.gz.sha256)  elian-1.0.0.tar.gz" | sha256sum -c - && tar xzf elian-1.0.0.tar.gz && bash elian-1.0.0/scripts/termux/bootstrap.sh
 ```
 
-> Замените `OWNER` и SHA-256 на свои: `sha256sum elian-1.0.0.tar.gz` после релиза.
-> Принципиально: **никаких `curl | bash`** — архив скачивается, проверяется по контрольной сумме и только потом выполняется скрипт.
-> Если вы распространяете код через свой сервер, используйте любую опубликованную вами версию архива с известной суммой.
+> Принципиально: **никаких `curl | bash`** — сначала скачивание и проверка контрольной суммы, потом запуск скрипта.
+> Без публикации репозитория можно поставить из уже готового архива: скачайте `elian-1.0.0.tar.gz` из рабочей папки
+> на телефон и выполните `cd ~ && tar xzf ~/storage/downloads/elian-1.0.0.tar.gz && bash elian-1.0.0/scripts/termux/bootstrap.sh`.
 
 Bootstrap идемпотентен: повторный запуск не удаляет базу и медиа, перед изменениями делает шифрованный бэкап,
 создаёт недостающие секреты, пересобирает клиент и перезапускает сервис. Он печатает публичный HTTPS-адрес,
