@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-release/
+*.log
+.env
+.env.local
+.elian/
+data/
+backups/
+*.elnb
+*.key
+test-results/
+playwright-report/
+.DS_Store

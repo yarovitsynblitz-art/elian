@@ -1,0 +1,29 @@
+{
+  "name": "elian",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Элиан / Elian — self-hosted messenger (Fastify + SQLite + React PWA)",
+  "license": "MIT",
+  "engines": { "node": ">=20.11" },
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "build": "npm run build -w @elian/shared && npm run build -w @elian/server && npm run build -w @elian/web",
+    "build:shared": "npm run build -w @elian/shared",
+    "dev": "npm run build:shared && concurrently -k -n server,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev -w @elian/server",
+    "dev:web": "npm run dev -w @elian/web",
+    "start": "node apps/server/dist/index.js",
+    "test": "npm run test -w @elian/server",
+    "test:e2e": "npm run test:e2e -w @elian/web",
+    "lint": "tsc -p packages/shared --noEmit && tsc -p apps/server --noEmit && tsc -p apps/web --noEmit",
+    "db:migrate": "node apps/server/dist/tools/migrate.js",
+    "db:seed": "node apps/server/dist/tools/seed.js",
+    "backup": "bash scripts/backup/backup.sh",
+    "restore": "bash scripts/backup/restore.sh",
+    "typecheck": "npm run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  }
+}

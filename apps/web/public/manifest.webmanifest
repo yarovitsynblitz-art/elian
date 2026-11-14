@@ -1,0 +1,25 @@
+{
+  "name": "Элиан — общение без лишнего",
+  "short_name": "Элиан",
+  "description": "Мессенджер Элиан: чаты, группы, каналы, истории и звонки.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0F0E1A",
+  "theme_color": "#4B3AF0",
+  "categories": ["social", "communication"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Чаты", "url": "/", "description": "Список чатов" },
+    { "name": "Поиск", "url": "/search", "description": "Глобальный поиск" },
+    { "name": "Настройки", "url": "/settings", "description": "Настройки профиля" }
+  ]
+}
