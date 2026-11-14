@@ -65,6 +65,9 @@ case "$CMD" in
       echo "QR-код: pkg install -y qrencode && elian qr" >&2
     fi
     ;;
+  tunnel|туннель|check-tunnel)
+    bash "$ROOT_DIR/scripts/cloudflare/check-tunnel.sh" "$@"
+    ;;
   console|owner)
     if command -v tmux >/dev/null 2>&1; then
       echo "tmux: list | show <код> | y | n | stats | help · выход: Ctrl-b, затем d"
@@ -125,6 +128,7 @@ EOT
   elian restart        перезапустить
   elian status         состояние, публичный адрес, ресурсы
   elian url            только публичная ссылка (+ предупреждение, если туннель упал)
+  elian tunnel [--live] диагностика туннеля: токен, домен, DNS, подключение (--live — поднять на 25 с)
   elian qr             QR-код со ссылкой (pkg install qrencode) — показать другу с телефона
   elian logs [server|tunnel] [N]   последние N строк лога (по умолчанию 80)
   elian console        консоль владельца (подтверждение входов: y / n)

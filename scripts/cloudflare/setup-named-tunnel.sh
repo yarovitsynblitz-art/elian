@@ -50,4 +50,11 @@ env_set PUBLIC_URL "https://$DOMAIN"
 env_set ALLOWED_ORIGINS "https://$DOMAIN"
 env_set ELIAN_TUNNEL_MODE named
 ok "домен: https://$DOMAIN (не забудьте Public Hostname в Cloudflare)"
-log "перезапуск: bash scripts/termux/restart.sh"
+
+# Сразу проверяем то, что чаще всего ломается: сам токен и делегирование домена
+# на Cloudflare. Без этого туннель молча не поднимется, а ссылка будет отдавать 1033.
+printf '\n'
+ELIAN_TUNNEL_MODE=named bash "$SCRIPT_DIR/check-tunnel.sh" || true
+
+printf '\n'
+log "дальше: bash scripts/termux/restart.sh  (и проверка: bash scripts/cloudflare/check-tunnel.sh --live)"

@@ -56,7 +56,7 @@ case "$MODE" in
   named)
     TOKEN_FILE="$ELIAN_TUNNEL_TOKEN_FILE"
     [[ -s "$TOKEN_FILE" ]] || die "нет токена туннеля ($TOKEN_FILE). Запустите: bash scripts/cloudflare/setup-named-tunnel.sh"
-    DOMAIN="${ELIAN_DOMAIN:-$(env_get PUBLIC_DOMAIN)}"
+    DOMAIN="$(resolve_domain)"
     export TUNNEL_TOKEN="$(tr -d '\r\n' < "$TOKEN_FILE")"
     log "запускаю именованный туннель для домена $DOMAIN (токен из файла, не из argv)"
     "$CLOUDFLARED" tunnel --no-autoupdate run 2>&1 | while IFS= read -r line; do

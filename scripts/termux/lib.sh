@@ -75,6 +75,15 @@ env_set() {
   chmod 600 "$ELIAN_ENV_FILE"
 }
 
+# Публичный домен именованного туннеля: аргумент окружения → ~/.elian/elian.env.
+# Возвращает пустую строку, если домен реально не настроен (плейсхолдер PUBLIC_DOMAIN).
+resolve_domain() {
+  local d="${ELIAN_DOMAIN:-}"
+  if [[ -z "$d" || "$d" == "PUBLIC_DOMAIN" ]]; then d="$(env_get PUBLIC_DOMAIN)"; fi
+  [[ "$d" == "PUBLIC_DOMAIN" ]] && d=""
+  printf '%s' "$d"
+}
+
 gen_secret() {
   # 32 случайных байта в hex — криптостойко, без внешних зависимостей.
   if have openssl; then openssl rand -hex 32; else head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; fi
