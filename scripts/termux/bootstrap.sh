@@ -59,6 +59,10 @@ ensure_layout
 chmod 600 "$ELIAN_ENV_FILE" 2>/dev/null || true
 log "данные: $ELIAN_DATA_DIR · секреты: $ELIAN_SECRETS_DIR (права 700)"
 
+# Запоминаем, где лежит код: пригодится команде `elian` и автозапуску после перезагрузки.
+printf '%s\n' "$ROOT_DIR" > "$ELIAN_HOME/repo-path"
+chmod 600 "$ELIAN_HOME/repo-path"
+
 step "3/9 Конфигурация и секреты"
 if (( FIRST_RUN )); then
   log "создаю $ELIAN_ENV_FILE"
@@ -197,6 +201,28 @@ else
   warn "публичный адрес пока не получен — смотрите: bash scripts/termux/logs.sh tunnel"
 fi
 
+step "Команда elian и автозапуск"
+chmod +x "$ROOT_DIR/scripts/termux/cli.sh" 2>/dev/null || true
+if [[ -n "${PREFIX:-}" && -d "$PREFIX/bin" && -w "$PREFIX/bin" ]]; then
+  ln -sf "$ROOT_DIR/scripts/termux/cli.sh" "$PREFIX/bin/elian"
+  log "команда установлена: elian (start | status | logs | console)"
+else
+  warn "команда elian не установлена в PATH — используйте: bash $ROOT_DIR/scripts/termux/cli.sh"
+fi
+
+# Автозапуск после перезагрузки телефона — только если установлен Termux:Boot.
+if [[ -d "$HOME/.termux/boot" ]]; then
+  cat > "$HOME/.termux/boot/elian-autostart.sh" <<EOS
+#!/data/data/com.termux/files/usr/bin/sh
+termux-wake-lock
+bash "$ROOT_DIR/scripts/termux/start.sh" >> "$ELIAN_LOG_DIR/boot.log" 2>&1
+EOS
+  chmod +x "$HOME/.termux/boot/elian-autostart.sh"
+  log "автозапуск при включении телефона: ~/.termux/boot/elian-autostart.sh"
+else
+  log "автозапуск не настроен (поставьте Termux:Boot из F-Droid и запустите bootstrap ещё раз)"
+fi
+
 cat <<SUMMARY_DONE
 
 $(printf '%s' "$C_B")Элиан установлен и запущен$(printf '%s' "$C_RESET")
@@ -211,12 +237,13 @@ $(printf '%s' "$C_B")Элиан установлен и запущен$(printf '
       tmux attach -t $ELIAN_SESSION        # выход из консоли: Ctrl-b затем d
   Команды консоли: list · show <код> · y [код] · n [код]
 
-  Управление:
+  Управление (или просто команда `elian`):
+      elian start | stop | restart | status | url | logs | console | backup | update
       bash scripts/termux/status.sh        # состояние
       bash scripts/termux/logs.sh [server|tunnel]
-      bash scripts/termux/restart.sh
-      bash scripts/termux/stop.sh
       bash scripts/backup/backup.sh        # шифрованный бэкап
+
+  После перезагрузки телефона: elian start  (или автозапуск через Termux:Boot)
 
   Важно: телефон должен быть подключён к сети и не «усыпляться». Termux держите
   в уведомлениях (wake-lock). Подробности: docs/TERMUX.md, docs/CLOUDFLARE.md.

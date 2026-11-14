@@ -91,3 +91,26 @@ bash scripts/backup/restore.sh <файл.elnb>   # восстановить (с�
 | «БАЗА НЕ ЗАШИФРОВАНА» | в `elian.env` должен быть `DB_ENCRYPTION=required`, ключ — `~/.elian/secrets/db_key.key` |
 | клиент открывается, но API 500 | чаще всего не хватает прав: `chmod 700 ~/.elian ~/.elian/secrets` |
 | телефон разряжается | это ожидаемо: сервер + туннель держат сеть. Используйте зарядку |
+
+## Повседневные команды: `elian`
+
+После `bootstrap.sh` в Termux появляется короткая команда (симлинк в `$PREFIX/bin/elian`):
+
+| Команда | Что делает |
+|---|---|
+| `elian start` | запустить сервер и туннель (если уже работает — ничего не делает) |
+| `elian stop` | остановить всё (данные сохраняются) |
+| `elian restart` | перезапустить |
+| `elian status` | процесс, health, публичный адрес, размер БД, последний бэкап |
+| `elian url` | только публичная ссылка |
+| `elian logs [server\|tunnel] [N]` | последние N строк лога |
+| `elian console` | консоль владельца: `list`, `show <код>`, `y`, `n`, выход `Ctrl-b` затем `d` |
+| `elian backup` | зашифрованный бэкап в `~/.elian/backups` |
+| `elian update` | `git pull` + пересборка (`bootstrap.sh`) |
+| `elian doctor` | диагностика: сборка, диск, секреты, health |
+
+Без команды то же самое: `bash scripts/termux/{start,stop,restart,status,logs}.sh`.
+
+**Телефон перезагрузился** → `elian start`. Чтобы запускалось само, поставьте
+[Termux:Boot](https://f-droid.org/packages/com.termux.boot/) и запустите `elian update`
+(или `bootstrap.sh`) ещё раз — он положит `~/.termux/boot/elian-autostart.sh`.
