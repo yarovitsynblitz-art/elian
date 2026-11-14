@@ -28,8 +28,23 @@ if [[ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]]; then
   TOKEN="$CLOUDFLARE_TUNNEL_TOKEN"           # можно передать через окружение (не через argv)
   log "использую токен из переменной окружения CLOUDFLARE_TUNNEL_TOKEN"
 else
-  read -r -s -p "Вставьте токен туннеля (ввод не отображается): " TOKEN; printf '\n'
+  printf '%s\n' "Вставьте токен туннеля (ввод не отображается)." \
+    "Можно вставить всю команду из Cloudflare целиком — например:" \
+    "  cloudflared.exe service install eyJhIjoi..." \
+    "токен из неё будет извлечён автоматически."
+  read -r -s -p "Токен (или команда): " TOKEN; printf '\n'
 fi
+
+# Из дашборда Cloudflare люди копируют целую команду установки, а не голый токен.
+# Достаём последнее слово, похожее на токен (eyJ…), и снимаем кавычки.
+if [[ "$TOKEN" == *[[:space:]]* ]]; then
+  read -r -a WORDS <<< "$TOKEN"
+  for ((w = ${#WORDS[@]} - 1; w >= 0; w--)); do
+    if [[ "${WORDS[w]}" == ey* ]]; then TOKEN="${WORDS[w]}"; break; fi
+    TOKEN="${WORDS[w]}"
+  done
+fi
+TOKEN="${TOKEN%\"}"; TOKEN="${TOKEN#\"}"; TOKEN="${TOKEN%\'}"; TOKEN="${TOKEN#\'}"
 
 [[ -n "$TOKEN" ]] || die "токен пуст"
 [[ ${#TOKEN} -ge 40 ]] || die "токен слишком короткий — похоже, скопирован не полностью"

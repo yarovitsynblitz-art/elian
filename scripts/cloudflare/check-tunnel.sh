@@ -44,16 +44,21 @@ else
   READ="$(node -e '
     const fs = require("fs");
     let token = fs.readFileSync(process.argv[1], "utf8").trim();
-    if (token.includes("--token")) token = token.split("--token")[1].trim().replace(/^["\x27]|["\x27]$/g, "");
-    let payload;
-    try {
-      payload = JSON.parse(Buffer.from(token.split("").reverse().join(""), "base64").split("").reverse().join(""));
-    } catch { payload = null; }
-    if (!payload) {
-      const padded = token.replace(/-/g, "+").replace(/_/g, "/");
-      try { payload = JSON.parse(Buffer.from(padded, "base64").toString("utf8")); } catch { payload = null; }
+    // Вставить могли целую команду установки — берём последнее слово и снимаем кавычки.
+    const words = token.split(/\s+/).filter(Boolean);
+    if (words.length > 1) token = words[words.length - 1];
+    token = token.replace(/^["\x27]|["\x27]$/g, "");
+    let payload = null;
+    for (const candidate of [token, token.split(".")[0]]) {
+      try {
+        const b64 = candidate.replace(/-/g, "+").replace(/_/g, "/");
+        const json = Buffer.from(b64, "base64").toString("utf8");
+        if (!json.startsWith("{")) continue;
+        const parsed = JSON.parse(json);
+        if (parsed && typeof parsed === "object") { payload = parsed; break; }
+      } catch { /* не токен */ }
     }
-    if (!payload || typeof payload !== "object") { console.log("BAD|"); process.exit(0); }
+    if (!payload) { console.log("BAD|"); process.exit(0); }
     const id = payload.t || "";
     const okShape = Boolean(payload.a && payload.t && payload.s);
     console.log((okShape ? "OK|" : "PART|") + id);
