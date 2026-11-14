@@ -104,6 +104,8 @@ bash scripts/backup/restore.sh <файл.elnb>   # восстановить (с�
 | `elian status` | процесс, health, публичный адрес, размер БД, последний бэкап |
 | `elian url` | только публичная ссылка |
 | `elian logs [server\|tunnel] [N]` | последние N строк лога |
+| `elian pending` | кто ждёт подтверждения (код, логин, тип) |
+| `elian approve [код]` / `elian deny [код]` | подтвердить / отклонить вход или регистрацию без tmux |
 | `elian console` | консоль владельца: `list`, `show <код>`, `y`, `n`, выход `Ctrl-b` затем `d` |
 | `elian backup` | зашифрованный бэкап в `~/.elian/backups` |
 | `elian update` | `git pull` + пересборка (`bootstrap.sh`) |

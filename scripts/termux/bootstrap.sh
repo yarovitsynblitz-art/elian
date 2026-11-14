@@ -201,6 +201,15 @@ else
   warn "публичный адрес пока не получен — смотрите: bash scripts/termux/logs.sh tunnel"
 fi
 
+# Хелпер для кнопок в шторке уведомлений Termux (Принять / Отклонить).
+mkdir -p "$ELIAN_HOME/bin"
+cat > "$ELIAN_HOME/bin/owner-action.sh" <<EOA
+#!/usr/bin/env bash
+# Вызывается кнопкой уведомления: owner-action.sh y|n <код>
+exec bash "$ROOT_DIR/scripts/termux/cli.sh" "\$1" "\$2"
+EOA
+chmod 700 "$ELIAN_HOME/bin/owner-action.sh"
+
 step "Команда elian и автозапуск"
 chmod +x "$ROOT_DIR/scripts/termux/cli.sh" 2>/dev/null || true
 if [[ -n "${PREFIX:-}" && -d "$PREFIX/bin" && -w "$PREFIX/bin" ]]; then

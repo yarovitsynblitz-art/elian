@@ -15,6 +15,19 @@ if [[ -z "$ROOT_DIR" || ! -d "$ROOT_DIR/scripts/termux" ]]; then
   ROOT_DIR="$(cd "$SELF_DIR/../.." && pwd)"
 fi
 
+
+# Запуск CLI владельца в контексте конфигурации Элиана (локально, без HTTP).
+owner_cli() {
+  local env_file="${ELIAN_ENV_FILE:-$HOME/.elian/elian.env}"
+  [[ -f "$env_file" ]] || { echo "нет конфигурации: $env_file" >&2; exit 1; }
+  [[ -f "$ROOT_DIR/apps/server/dist/tools/owner-cli.js" ]] || { echo "сервер не собран: elian update" >&2; exit 1; }
+  (
+    cd "$ROOT_DIR" || exit 1
+    set -a; . "$env_file"; set +a
+    node apps/server/dist/tools/owner-cli.js "$@"
+  )
+}
+
 S="$ROOT_DIR/scripts/termux"
 CMD="${1:-help}"; shift || true
 
@@ -40,6 +53,19 @@ case "$CMD" in
       echo "tmux не установлен: pkg install tmux" >&2
       exit 1
     fi
+    ;;
+  # ── подтверждение входов/регистраций без tmux ──
+  pending|queue|list)
+    owner_cli list
+    ;;
+  approve|a|yes|y)
+    owner_cli y "${1:-}"
+    ;;
+  deny|reject|n|no)
+    owner_cli n "${1:-}"
+    ;;
+  show)
+    owner_cli show "${1:-}"
     ;;
   backup)       bash "$ROOT_DIR/scripts/backup/backup.sh" "$@" ;;
   restore)      bash "$ROOT_DIR/scripts/backup/restore.sh" "$@" ;;
@@ -78,6 +104,9 @@ EOT
   elian url            только публичная ссылка
   elian logs [server|tunnel] [N]   последние N строк лога (по умолчанию 80)
   elian console        консоль владельца (подтверждение входов: y / n)
+  elian pending        кто ждёт подтверждения (код, логин, тип)
+  elian approve [код]  подтвердить регистрацию/вход (без кода — единственный запрос)
+  elian deny [код]     отклонить запрос
   elian backup         зашифрованный бэкап в ~/.elian/backups
   elian update         git pull + пересборка (bootstrap)
   elian doctor         диагностика: процесс, сборка, диск, секреты
