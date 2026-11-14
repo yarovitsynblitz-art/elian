@@ -133,3 +133,19 @@ npm run lint && npm run build
 - **ошибка `npm ci` не показывала причину** (вывод уходил в `tail -5`) → теперь лог пишется в
   `~/.elian/logs/deps.log`, при сбое печатаются последние 25 строк и подсказка `pkg install -y python make clang`,
   плюс один автоматический повтор.
+
+## Termux: Argon2id без компилятора (найдено на реальном телефоне)
+
+На Termux (aarch64, Node.js v24.17.0, clang/libc++) установка падала на сборке нативного пакета `argon2`:
+`std::basic_string<unsigned char>::resize` не существует в современном libc++ → `make: *** [argon2.target.mk:132] Error 1`.
+
+Решение: хэширование паролей переведено на **hash-wasm** (Argon2id в WebAssembly, чистый JS/WASM, без node-gyp).
+Формат хэшей не изменился (`$argon2id$v=19$m=19456,t=2,p=1$salt$hash`), старые пароли проверяются как раньше.
+
+| Проверка после замены | Результат |
+|---|---|
+| `tsc` (shared + server + web) | чисто |
+| `vitest run` | 64/64 |
+| живой смоук production-сборки | 39/39 |
+| скорость Argon2id (m=19456, t=2, p=1) | ~55–75 мс на хэш (WASM), приемлемо |
+| нативных зависимостей осталось | 1 (`better-sqlite3-multiple-ciphers`, нужен для SQLCipher) |

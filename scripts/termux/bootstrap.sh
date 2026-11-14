@@ -25,12 +25,16 @@ step "1/9 Проверка окружения"
 find "$ROOT_DIR/scripts" -name "*.sh" -type f -exec chmod +x {} + 2>/dev/null || true
 if is_termux; then
   log "Termux обнаружен ($(uname -m))"
-  for pkg in nodejs-lts git tmux curl openssl tar; do
+  for pkg in nodejs-lts git tmux curl openssl tar clang make python; do
     if ! have "${pkg%%-*}" && [[ "$pkg" == nodejs-lts ]] && ! have node; then
       require_termux_pkg "$pkg"
     elif ! have "$pkg"; then
       require_termux_pkg "$pkg"
     fi
+  done
+  # clang/make/python нужны для сборки better-sqlite3-multiple-ciphers (SQLCipher).
+  for bin in clang make python3; do
+    have "$bin" || warn "не найден $bin — сборка нативного модуля БД может не удаться"
   done
   have termux-wake-lock && termux-wake-lock 2>/dev/null || true
 else
