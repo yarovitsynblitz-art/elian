@@ -223,3 +223,16 @@ WRN ... your machine/network is getting its egress UDP to port 7844 blocked or d
 INF Initial protocol http2
 INF Registered tunnel connection connIndex=0 ... protocol=http2
 ```
+
+### `elian check` — вердикт вместо догадок
+
+```bash
+elian check
+```
+
+Проверяет по порядку: локальный сервер → процесс туннеля и транспорт → подключение к Cloudflare
+по логу (`Registered tunnel connection … protocol=http2`) → публичный адрес (DNS + HTTPS-запрос
+с самого телефона). Печатает «Всё работает» либо список проблем с конкретным действием.
+
+Проверено сквозным прогоном: локальный сервер ← туннель `http2` ← Cloudflare ← запрос
+`https://…trycloudflare.com/api/v1/health` → `200`, вывод: «ссылка открывается снаружи (200)».

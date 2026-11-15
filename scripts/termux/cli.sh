@@ -165,6 +165,9 @@ case "$CMD" in
       echo "QR-код: pkg install -y qrencode && elian qr" >&2
     fi
     ;;
+  check|проверка|verify)
+    bash "$S/check.sh" "$@"
+    ;;
   tunnel|туннель|check-tunnel)
     bash "$ROOT_DIR/scripts/cloudflare/check-tunnel.sh" "$@"
     ;;
@@ -247,6 +250,7 @@ EOT
   elian status         состояние, публичный адрес, ресурсы
   elian url            публичная ссылка (и копирует её в буфер обмена на телефоне)
   elian open           открыть публичную ссылку в браузере телефона
+  elian check          проверить всё: сервер, туннель, внешняя ссылка (вердикт словами)
   elian local          адрес на самом телефоне — работает без интернета и без туннеля
   elian local-open     открыть этот адрес в браузере телефона
   elian lan on|off     доступ с других устройств в домашней Wi-Fi (без интернета)
