@@ -15,6 +15,9 @@ if [[ -z "$ROOT_DIR" || ! -d "$ROOT_DIR/scripts/termux" ]]; then
   ROOT_DIR="$(cd "$SELF_DIR/../.." && pwd)"
 fi
 
+# shellcheck source=./lib.sh
+. "$ROOT_DIR/scripts/termux/lib.sh"
+
 
 # Запуск CLI владельца в контексте конфигурации Элиана (локально, без HTTP).
 owner_cli() {
@@ -69,6 +72,61 @@ case "$CMD" in
     else
       echo "(открыть нечем: pkg install -y termux-tools — или скопируйте ссылку выше)" >&2
     fi
+    ;;
+  local|локально|local-open|локально-открыть)
+    ELIAN_HOME="${ELIAN_HOME:-$HOME/.elian}"
+    mkdir -p "$ELIAN_HOME"
+    ENV_FILE="${ELIAN_ENV_FILE:-$ELIAN_HOME/elian.env}"
+    PORT_NOW="$(sed -n 's/^PORT=//p' "$ENV_FILE" 2>/dev/null | tail -1)"
+    PORT_NOW="${PORT_NOW:-3000}"
+    LOCAL_URL="http://127.0.0.1:${PORT_NOW}"
+    IP="$(lan_ip)"
+    printf 'на телефоне (интернет не нужен): %s\n' "$LOCAL_URL"
+    if [[ -n "$IP" ]]; then
+      if [[ "$(sed -n 's/^HOST=//p' "$ENV_FILE" 2>/dev/null | tail -1)" == "0.0.0.0" ]]; then
+        printf 'в домашней сети (другие устройства): http://%s:%s\n' "$IP" "$PORT_NOW"
+      else
+        printf 'в домашней сети: выключено — включить: elian lan on\n'
+      fi
+    fi
+    if [[ "$CMD" == local-open* || "$CMD" == локально-открыть ]]; then
+      if command -v termux-open-url >/dev/null 2>&1; then
+        termux-open-url "$LOCAL_URL" >/dev/null 2>&1 && echo "(открыл $LOCAL_URL в браузере)" >&2
+      elif command -v termux-open >/dev/null 2>&1; then
+        : # нет браузера — останется только напечатанный адрес
+      fi
+    elif command -v termux-clipboard-set >/dev/null 2>&1; then
+      termux-clipboard-set "$LOCAL_URL" >/dev/null 2>&1 && echo "(адрес $LOCAL_URL скопирован в буфер)" >&2
+    fi
+    ;;
+  lan|сеть)
+    ELIAN_HOME="${ELIAN_HOME:-$HOME/.elian}"
+    mkdir -p "$ELIAN_HOME"
+    ENV_FILE="${ELIAN_ENV_FILE:-$ELIAN_HOME/elian.env}"
+    ACTION="${1:-status}"
+    case "$ACTION" in
+      on|вкл)
+        sed -i 's/^HOST=.*/HOST=0.0.0.0/' "$ENV_FILE" 2>/dev/null || printf 'HOST=0.0.0.0\n' >> "$ENV_FILE"
+        grep -q '^HOST=' "$ENV_FILE" || printf 'HOST=0.0.0.0\n' >> "$ENV_FILE"
+        echo "доступ из домашней сети включён. Перезапускаю…"
+        bash "$S/restart.sh" >/dev/null 2>&1 || true
+        IP="$(lan_ip)"; PORT_NOW="$(sed -n 's/^PORT=//p' "$ENV_FILE" | tail -1)"
+        echo "открывайте с других устройств: http://${IP:-<ip-телефона>}:${PORT_NOW:-3000}"
+        echo "важно: это доступ без интернета, но и без туннеля — только внутри вашей Wi-Fi. Вход по паролю обязателен."
+        ;;
+      off|выкл)
+        sed -i 's/^HOST=.*/HOST=127.0.0.1/' "$ENV_FILE" 2>/dev/null || true
+        echo "доступ из домашней сети выключен (только сам телефон). Перезапускаю…"
+        bash "$S/restart.sh" >/dev/null 2>&1 || true
+        ;;
+      *)
+        if [[ "$(sed -n 's/^HOST=//p' "$ENV_FILE" 2>/dev/null | tail -1)" == "0.0.0.0" ]]; then
+          echo "доступ из домашней сети: включён ($(lan_ip):$(sed -n 's/^PORT=//p' "$ENV_FILE" | tail -1))"
+        else
+          echo "доступ из домашней сети: выключен (включить: elian lan on)"
+        fi
+        ;;
+    esac
     ;;
   qr|код)
     ELIAN_HOME="${ELIAN_HOME:-$HOME/.elian}"
@@ -146,6 +204,9 @@ EOT
   elian status         состояние, публичный адрес, ресурсы
   elian url            публичная ссылка (и копирует её в буфер обмена на телефоне)
   elian open           открыть публичную ссылку в браузере телефона
+  elian local          адрес на самом телефоне — работает без интернета и без туннеля
+  elian local-open     открыть этот адрес в браузере телефона
+  elian lan on|off     доступ с других устройств в домашней Wi-Fi (без интернета)
   elian tunnel [--live] диагностика туннеля: токен, домен, DNS, подключение (--live — поднять на 25 с)
   elian qr             QR-код со ссылкой (pkg install qrencode) — показать другу с телефона
   elian logs [server|tunnel] [N]   последние N строк лога (по умолчанию 80)

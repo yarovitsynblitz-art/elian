@@ -22,6 +22,10 @@ else
   warn "health: не отвечает на 127.0.0.1:${ELIAN_PORT}"
 fi
 
+printf '  на телефоне: http://127.0.0.1:%s  (работает без интернета)\n' "$ELIAN_PORT"
+if [[ "$(env_get HOST)" == "0.0.0.0" ]]; then
+  printf '  в домашней сети: http://%s:%s\n' "$(lan_ip)" "$ELIAN_PORT"
+fi
 URL="$(cat "$ELIAN_HOME/public-url.txt" 2>/dev/null || true)"
 printf '  публичный адрес: %s\n' "${URL:-—}"
 # Туннель живёт отдельным процессом: если он упал, ссылка превращается в «Error 1033».
