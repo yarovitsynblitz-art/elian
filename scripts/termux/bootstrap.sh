@@ -196,12 +196,17 @@ step "9/9 Запуск сервера и туннеля"
 # а страница открывается пустой или не открывается совсем.
 bash "$SCRIPT_DIR/start.sh" --force
 
-PUBLIC_URL="$(cat "$ELIAN_HOME/public-url.txt" 2>/dev/null || true)"
+PUBLIC_URL=""
+for _ in $(seq 1 15); do
+  PUBLIC_URL="$(cat "$ELIAN_HOME/public-url.txt" 2>/dev/null || true)"
+  [[ -n "$PUBLIC_URL" ]] && break
+  sleep 1
+done
 if [[ -n "$PUBLIC_URL" ]]; then
   env_set PUBLIC_URL "$PUBLIC_URL"
   ok "Публичный адрес: $PUBLIC_URL"
 else
-  warn "публичный адрес пока не получен — смотрите: bash scripts/termux/logs.sh tunnel"
+  warn "публичный адрес ещё не получен — через минуту: elian url (или: bash scripts/termux/logs.sh tunnel)"
 fi
 
 # Хелпер для кнопок в шторке уведомлений Termux (Принять / Отклонить).

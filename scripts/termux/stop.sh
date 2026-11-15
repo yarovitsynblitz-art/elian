@@ -20,10 +20,12 @@ fi
 if have tmux; then
   tmux kill-window -t "$ELIAN_SESSION:tunnel" 2>/dev/null || true
 fi
-if tunnel_running; then
-  kill "$(cat "$TUNNEL_PID_FILE")" 2>/dev/null || true
-  rm -f "$TUNNEL_PID_FILE"
+TUNNEL_PID=""
+[[ -f "$TUNNEL_PID_FILE" ]] && TUNNEL_PID="$(cat "$TUNNEL_PID_FILE" 2>/dev/null || true)"
+if [[ -n "$TUNNEL_PID" ]]; then
+  kill "$TUNNEL_PID" 2>/dev/null || true
 fi
+rm -f "$TUNNEL_PID_FILE"
 # Страховка от накопившихся экземпляров: супервизор, cloudflared и «хвост» tee.
 pkill -f "scripts/cloudflare/tunnel.sh" 2>/dev/null || true
 pkill -f "cloudflared tunnel" 2>/dev/null || true

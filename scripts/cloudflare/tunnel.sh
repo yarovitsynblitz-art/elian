@@ -56,7 +56,9 @@ case "$MODE" in
     HISTORY_FILE="$ELIAN_HOME/public-url.history"
     backoff=5
     while true; do
-      rm -f "$URL_FILE"
+      # Файл с прошлым адресом не стираем: пока Cloudflare выдаёт новый, лучше
+      # показывать «последний известный», чем пустоту (иначе bootstrap и elian url
+      # успевают прочитать пустой файл и пишут «адрес не получен»).
       log "запускаю Quick Tunnel → http://127.0.0.1:${ELIAN_PORT}"
       # --url печатает адрес в stderr; вытаскиваем его в файл, лог и уведомление.
       # set +e: падение cloudflared — штатная ситуация для супервизора, а не конец скрипта.

@@ -120,7 +120,10 @@ server_running() {
 }
 
 tunnel_running() {
-  [[ -f "$TUNNEL_PID_FILE" ]] && kill -0 "$(cat "$TUNNEL_PID_FILE")" 2>/dev/null
+  local pid
+  [[ -f "$TUNNEL_PID_FILE" ]] || return 1
+  pid="$(cat "$TUNNEL_PID_FILE" 2>/dev/null || true)"
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
 }
 
 # Уведомление в шторку Android (Termux:API). На ПК и без termux-api — молча ничего.
