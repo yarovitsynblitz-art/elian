@@ -202,3 +202,24 @@ E2E 3/3 (4 прогона подряд без флейков), UI-аудит 0 �
 | Свежий адрес сразу отдаёт 1033 | после серии `restart` параллельно оставались жить несколько `cloudflared`; каждый получал своё имя, в `public-url.txt` попадало имя того, чей коннектор к Cloudflare уже не подключён | `tunnel.sh` — один экземпляр на установку (проверка pid + принадлежности процесса), `stop.sh` добивает tmux-окно `tunnel`, супервизор, `cloudflared` и `tee` |
 | `elian url` / `elian open` показывали и открывали нерабочую ссылку | не было проверки, что адрес реально отвечает снаружи | после получения адреса `tunnel.sh` стучится по нему через Cloudflare (5 попыток) и пишет `public-url.status`; `elian url` предупреждает, `elian open` отказывается открывать |
 | Туннель и сервер «сами умерли» | Android выгружает Termux из памяти без wake-lock | `elian doctor` теперь проверяет наличие `termux-api`/`wake-lock` и число экземпляров `cloudflared`, подсказывает `termux-wake-lock` |
+
+## Раунд 5: найдена настоящая причина 1033 — блокировка QUIC
+
+В `~/.elian/logs/tunnel.log` с телефона:
+
+```
+ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity"
+WRN ... your machine/network is getting its egress UDP to port 7844 blocked or dropped
+```
+
+`cloudflared` по умолчанию ходит по QUIC (UDP 7844), а мобильный оператор/VPN этот UDP режет:
+коннектор не поднимается, Cloudflare успевает выдать имя и теряет его → в браузере `Error 1033`,
+а супервизор честно перезапускает туннель и выдаёт новое имя (отсюда «адрес менялся: 17 раз»).
+
+Исправление: `tunnel.sh` запускает `cloudflared` с `--protocol http2` (TCP), вернуть QUIC можно
+через `ELIAN_TUNNEL_PROTOCOL=quic`. Проверено с настоящим `cloudflared` 2026.11.0:
+
+```
+INF Initial protocol http2
+INF Registered tunnel connection connIndex=0 ... protocol=http2
+```

@@ -13,6 +13,13 @@ ELIAN_TUNNEL_MODE=quick bash scripts/termux/bootstrap.sh
 - Адрес меняется после перезапуска. Подходит для «попробовать и показать друзьям».
 - Аккаунт Cloudflare не нужен, но и гарантий SLA нет.
 
+### Если в логе туннеля `failed to dial to edge with quic`
+
+Это блокировка UDP-порта 7844 вашим оператором или VPN. `cloudflared` по умолчанию ходит по QUIC,
+поэтому коннектор не поднимается, Cloudflare выдаёт имя и сразу теряет его — в браузере 1033.
+Элиан по умолчанию запускает туннель с `--protocol http2` (TCP), проверено: `Registered tunnel connection ... protocol=http2`.
+Вернуть QUIC можно так: `ELIAN_TUNNEL_PROTOCOL=quic` в `~/.elian/elian.env` и `elian restart`.
+
 ### Если открывается «Error 1033» / «Cloudflare Tunnel error»
 
 Это значит, что ссылка в закладке **устарела**: у Quick Tunnel адрес привязан к процессу

@@ -220,6 +220,10 @@ case "$CMD" in
     if [[ -s "$ELIAN_HOME/public-url.status" ]]; then
       printf 'проверка ссылки: %s\n' "$(cat "$ELIAN_HOME/public-url.status")"
     fi
+    printf 'транспорт туннеля: %s (http2 надёжнее в мобильных сетях: QUIC/UDP 7844 часто режут)\n' "${ELIAN_TUNNEL_PROTOCOL:-http2}"
+    if [[ -f "$ELIAN_LOG_DIR/tunnel.log" ]] && grep -q "Failed to dial to edge with quic" "$ELIAN_LOG_DIR/tunnel.log" 2>/dev/null; then
+      printf 'в логе есть обрывы QUIC — это и была причина 1033; сейчас используется http2\n'
+    fi
     CHANGES=0
     if [[ -f "$ELIAN_HOME/public-url.history" ]]; then CHANGES="$(wc -l < "$ELIAN_HOME/public-url.history")"; fi
     printf 'адрес менялся: %s раз(а) — см. ~/.elian/public-url.history\n' "$CHANGES"

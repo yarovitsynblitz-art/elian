@@ -11,6 +11,11 @@ CLOUDFLARED="${ELIAN_BIN_DIR}/cloudflared"
 [[ -x "$CLOUDFLARED" ]] || die "cloudflared не установлен: bash scripts/cloudflare/install-cloudflared.sh"
 
 MODE="${ELIAN_TUNNEL_MODE:-quick}"
+# Транспорт до Cloudflare. QUIC ходит по UDP 7844, и мобильные операторы/VPN его часто
+# режут — тогда в логе «failed to dial to edge with quic», а браузер показывает 1033.
+# HTTP/2 идёт по TCP и работает почти всегда; при желании можно вернуть quic:
+#   ELIAN_TUNNEL_PROTOCOL=quic  (в ~/.elian/elian.env)
+PROTOCOL="${ELIAN_TUNNEL_PROTOCOL:-http2}"
 mkdir -p "$ELIAN_LOG_DIR"
 URL_FILE="$ELIAN_HOME/public-url.txt"
 STATUS_FILE="$ELIAN_HOME/public-url.status"
@@ -59,14 +64,20 @@ case "$MODE" in
       # Файл с прошлым адресом не стираем: пока Cloudflare выдаёт новый, лучше
       # показывать «последний известный», чем пустоту (иначе bootstrap и elian url
       # успевают прочитать пустой файл и пишут «адрес не получен»).
-      log "запускаю Quick Tunnel → http://127.0.0.1:${ELIAN_PORT}"
+      log "запускаю Quick Tunnel → http://127.0.0.1:${ELIAN_PORT} (протокол ${PROTOCOL})"
       # --url печатает адрес в stderr; вытаскиваем его в файл, лог и уведомление.
       # set +e: падение cloudflared — штатная ситуация для супервизора, а не конец скрипта.
       set +e
-      "$CLOUDFLARED" tunnel --no-autoupdate --url "http://127.0.0.1:${ELIAN_PORT}" 2>&1 | while IFS= read -r line; do
+      "$CLOUDFLARED" tunnel --no-autoupdate --protocol "$PROTOCOL" --url "http://127.0.0.1:${ELIAN_PORT}" 2>&1 | while IFS= read -r line; do
         printf '%s\n' "$line"
         # В логах cloudflared бывают служебные хосты (api.trycloudflare.com и т.п.) —
         # адресом туннеля считаем только настоящий, вида a-b-c.trycloudflare.com.
+        # Диагностика транспорта: такие ошибки объясняют 1033 лучше любых догадок.
+        if [[ "$line" == *"quic"* && ( "$line" == *"Failed to dial"* || "$line" == *"Retrying connection"* ) ]]; then
+          if [[ "$PROTOCOL" == "quic" ]]; then
+            warn "QUIC не проходит (UDP 7844 заблокирован). Переключите транспорт: ELIAN_TUNNEL_PROTOCOL=http2 в ~/.elian/elian.env"
+          fi
+        fi
         if [[ "$line" =~ https://[a-z0-9-]+\.trycloudflare\.com ]] && valid_public_url "${BASH_REMATCH[0]}"; then
           local_url="${BASH_REMATCH[0]}"
           printf '%s\n' "$local_url" > "$URL_FILE"
@@ -97,7 +108,7 @@ case "$MODE" in
     DOMAIN="$(resolve_domain)"
     export TUNNEL_TOKEN="$(tr -d '\r\n' < "$TOKEN_FILE")"
     log "запускаю именованный туннель для домена $DOMAIN (токен из файла, не из argv)"
-    "$CLOUDFLARED" tunnel --no-autoupdate run 2>&1 | while IFS= read -r line; do
+    "$CLOUDFLARED" tunnel --no-autoupdate --protocol "$PROTOCOL" run 2>&1 | while IFS= read -r line; do
       printf '%s\n' "$line"
       if [[ "$line" == *"Registered tunnel connection"* ]]; then
         if [[ -n "$DOMAIN" && "$DOMAIN" != "PUBLIC_DOMAIN" ]]; then
