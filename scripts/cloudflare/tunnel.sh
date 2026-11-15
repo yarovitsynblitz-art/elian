@@ -13,6 +13,38 @@ CLOUDFLARED="${ELIAN_BIN_DIR}/cloudflared"
 MODE="${ELIAN_TUNNEL_MODE:-quick}"
 mkdir -p "$ELIAN_LOG_DIR"
 URL_FILE="$ELIAN_HOME/public-url.txt"
+STATUS_FILE="$ELIAN_HOME/public-url.status"
+PIDFILE="$ELIAN_HOME/tunnel.pid"
+
+# Один туннель на установку. Иначе после нескольких restart'ов параллельно живут
+# несколько cloudflared, каждый получает свой адрес и перетирает public-url.txt —
+# открываешь ссылку, а Cloudflare отвечает 1033, потому что её коннектор уже мёртв.
+if [[ -f "$PIDFILE" ]]; then
+  OTHER_PID="$(cat "$PIDFILE" 2>/dev/null || true)"
+  if [[ -n "$OTHER_PID" && "$OTHER_PID" != "$$" ]] && kill -0 "$OTHER_PID" 2>/dev/null \
+     && ps -p "$OTHER_PID" -o args= 2>/dev/null | grep -q "tunnel.sh"; then
+    warn "туннель уже запущен (pid $OTHER_PID) — второй экземпляр не нужен"
+    exit 0
+  fi
+fi
+printf '%s\n' "$$" > "$PIDFILE"
+trap '[[ "$(cat "$PIDFILE" 2>/dev/null || true)" == "$$" ]] && rm -f "$PIDFILE"' EXIT
+
+# Проверяем, что адрес реально открывается через Cloudflare: свежий Quick Tunnel
+# иногда существует в логе, но ещё не резолвится — тогда честно помечаем это.
+self_check() {
+  local url="$1" attempt code=""
+  for attempt in 1 2 3 4 5; do
+    code="$(curl -s -o /dev/null -m 8 -w '%{http_code}' "$url/api/v1/health" 2>/dev/null || echo 000)"
+    if [[ "$code" == "200" ]]; then
+      printf 'ok %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
+      return 0
+    fi
+    sleep 6
+  done
+  printf 'unreachable %s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${code:-000}" > "$STATUS_FILE"
+  warn "адрес $url пока не открывается снаружи (код ${code:-000}) — Cloudflare ещё не подхватил туннель"
+}
 
 case "$MODE" in
   quick)
@@ -39,6 +71,8 @@ case "$MODE" in
           chmod 600 "$URL_FILE"
           printf '%s  %s\n' "$(date '+%Y-%m-%d %H:%M')" "$local_url" >> "$HISTORY_FILE"
           ok "публичный адрес: ${local_url}"
+          rm -f "$STATUS_FILE"
+          ( self_check "$local_url" ) >/dev/null 2>&1 &
           if [[ -n "$PREV_URL" && "$local_url" != "$PREV_URL" ]]; then
             warn "ВНИМАНИЕ: адрес изменился. Старая ссылка (${PREV_URL}) больше не работает — на телефоне будет «Error 1033»."
             warn "Новая ссылка: ${local_url} — обновите закладку / ярлык на экране «Домой»."

@@ -53,6 +53,16 @@ case "$CMD" in
       if [[ ! -f "$ELIAN_HOME/tunnel.pid" ]] || ! kill -0 "$(cat "$ELIAN_HOME/tunnel.pid" 2>/dev/null)" 2>/dev/null; then
         echo "(!) процесс туннеля не найден — ссылка может не открываться (Error 1033). Запустите: elian start" >&2
       fi
+      STATUS_FILE="$ELIAN_HOME/public-url.status"
+      if [[ -s "$STATUS_FILE" ]]; then
+        case "$(cut -d' ' -f1 "$STATUS_FILE")" in
+          ok) : ;;
+          unreachable)
+            echo "(!) эта ссылка пока не открывается снаружи (Cloudflare ещё не подхватил туннель)." >&2
+            echo "    подождите 20–30 секунд или выполните: elian restart" >&2
+            ;;
+        esac
+      fi
       if [[ "${ELIAN_TUNNEL_MODE:-quick}" == "quick" ]]; then
         echo "(временный адрес *.trycloudflare.com: меняется после перезапуска и пробуждения телефона; постоянный — bash scripts/cloudflare/setup-named-tunnel.sh)" >&2
       fi
@@ -72,6 +82,11 @@ case "$CMD" in
     if ! valid_public_url "$URL"; then
       echo "адрес в файле не похож на адрес туннеля: $URL" >&2
       echo "восстановить: elian restart" >&2
+      exit 1
+    fi
+    if [[ -s "$ELIAN_HOME/public-url.status" ]] && [[ "$(cut -d' ' -f1 "$ELIAN_HOME/public-url.status")" == "unreachable" ]]; then
+      echo "ссылка $URL пока не открывается снаружи — Cloudflare ещё не подхватил туннель." >&2
+      echo "подождите 20–30 секунд и повторите (или elian restart). Локально всё работает: elian local-open" >&2
       exit 1
     fi
     echo "$URL"
@@ -194,6 +209,20 @@ case "$CMD" in
     printf 'сборка сервера: %s\n' "$([[ -f "$ROOT_DIR/apps/server/dist/index.js" ]] && echo есть || echo НЕТ)"
     printf 'свободно на диске: %s\n' "$(df -h "$HOME" | awk 'NR==2 {print $4}')"
     printf 'секреты: %s\n' "$(ls "$HOME/.elian/secrets" 2>/dev/null | wc -l) файлов"
+    # Android любит «усыплять» Termux: тогда умирают и сервер, и туннель.
+    if command -v termux-wake-lock >/dev/null 2>&1; then
+      printf 'termux-api: есть (проверьте, что wake-lock включён: termux-wake-lock)\n'
+    else
+      printf 'termux-api: НЕТ — поставьте «pkg install termux-api» и приложение Termux:API из F-Droid,\n'
+      printf '            затем выполните termux-wake-lock (иначе Android может убивать сервер)\n'
+    fi
+    printf 'экземпляров cloudflared: %s\n' "$(pgrep -c -f 'cloudflared tunnel' 2>/dev/null || echo 0)"
+    if [[ -s "$ELIAN_HOME/public-url.status" ]]; then
+      printf 'проверка ссылки: %s\n' "$(cat "$ELIAN_HOME/public-url.status")"
+    fi
+    CHANGES=0
+    if [[ -f "$ELIAN_HOME/public-url.history" ]]; then CHANGES="$(wc -l < "$ELIAN_HOME/public-url.history")"; fi
+    printf 'адрес менялся: %s раз(а) — см. ~/.elian/public-url.history\n' "$CHANGES"
     ;;
   uninstall)
     cat <<'EOT'
