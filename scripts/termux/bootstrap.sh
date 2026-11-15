@@ -191,7 +191,10 @@ case "$ELIAN_TUNNEL_MODE" in
 esac
 
 step "9/9 Запуск сервера и туннеля"
-bash "$SCRIPT_DIR/start.sh"
+# Важно: сборка уже обновила файлы на диске, поэтому работающий процесс нужно перезапустить.
+# Иначе после обновления продолжает работать старый код (и старый список статики),
+# а страница открывается пустой или не открывается совсем.
+bash "$SCRIPT_DIR/start.sh" --force
 
 PUBLIC_URL="$(cat "$ELIAN_HOME/public-url.txt" 2>/dev/null || true)"
 if [[ -n "$PUBLIC_URL" ]]; then

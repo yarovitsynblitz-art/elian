@@ -77,6 +77,26 @@ env_set() {
 
 # Публичный домен именованного туннеля: аргумент окружения → ~/.elian/elian.env.
 # Возвращает пустую строку, если домен реально не настроен (плейсхолдер PUBLIC_DOMAIN).
+# Настоящий ли это публичный адрес. В логах cloudflared встречаются служебные хосты
+# (api.trycloudflare.com и подобные) — их нельзя принимать за адрес туннеля.
+valid_public_url() {
+  local url="${1:-}" host label dom
+  [[ "$url" == https://* ]] || return 1
+  host="${url#https://}"; host="${host%%/*}"; host="${host%%:*}"
+  if [[ "$host" == *.trycloudflare.com ]]; then
+    label="${host%.trycloudflare.com}"
+    case "$label" in
+      api|www|dash|one|developers|blog|community|support|static|cloudflare|help|status) return 1 ;;
+    esac
+    # Имена Quick Tunnel собираются из нескольких слов через дефис: a-b-c…
+    [[ "$label" == *-*-* ]] || return 1
+    return 0
+  fi
+  dom="$(resolve_domain)"
+  [[ -n "$dom" && "$host" == "$dom" ]] && return 0
+  return 1
+}
+
 resolve_domain() {
   local d="${ELIAN_DOMAIN:-}"
   if [[ -z "$d" || "$d" == "PUBLIC_DOMAIN" ]]; then d="$(env_get PUBLIC_DOMAIN)"; fi

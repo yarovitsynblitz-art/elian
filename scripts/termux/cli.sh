@@ -43,6 +43,11 @@ case "$CMD" in
   url|addr)
     ELIAN_HOME="${ELIAN_HOME:-$HOME/.elian}"
     URL_FILE="$ELIAN_HOME/public-url.txt"
+    if [[ -s "$URL_FILE" ]] && ! valid_public_url "$(cat "$URL_FILE")"; then
+      echo "в файле адреса лежит служебное значение: $(cat "$URL_FILE") — это не адрес вашего туннеля." >&2
+      echo "исправить: elian restart" >&2
+      exit 1
+    fi
     if [[ -s "$URL_FILE" ]]; then
       cat "$URL_FILE"
       if [[ ! -f "$ELIAN_HOME/tunnel.pid" ]] || ! kill -0 "$(cat "$ELIAN_HOME/tunnel.pid" 2>/dev/null)" 2>/dev/null; then
@@ -64,6 +69,11 @@ case "$CMD" in
     ELIAN_HOME="${ELIAN_HOME:-$HOME/.elian}"
     URL="$(cat "$ELIAN_HOME/public-url.txt" 2>/dev/null || true)"
     [[ -n "$URL" ]] || { echo "публичный адрес ещё не определён — elian start" >&2; exit 1; }
+    if ! valid_public_url "$URL"; then
+      echo "адрес в файле не похож на адрес туннеля: $URL" >&2
+      echo "восстановить: elian restart" >&2
+      exit 1
+    fi
     echo "$URL"
     if command -v termux-open-url >/dev/null 2>&1; then
       termux-open-url "$URL" >/dev/null 2>&1 && echo "(открыл в браузере)" >&2

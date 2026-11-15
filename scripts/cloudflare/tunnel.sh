@@ -31,7 +31,9 @@ case "$MODE" in
       set +e
       "$CLOUDFLARED" tunnel --no-autoupdate --url "http://127.0.0.1:${ELIAN_PORT}" 2>&1 | while IFS= read -r line; do
         printf '%s\n' "$line"
-        if [[ "$line" =~ https://[a-z0-9-]+\.trycloudflare\.com ]]; then
+        # В логах cloudflared бывают служебные хосты (api.trycloudflare.com и т.п.) —
+        # адресом туннеля считаем только настоящий, вида a-b-c.trycloudflare.com.
+        if [[ "$line" =~ https://[a-z0-9-]+\.trycloudflare\.com ]] && valid_public_url "${BASH_REMATCH[0]}"; then
           local_url="${BASH_REMATCH[0]}"
           printf '%s\n' "$local_url" > "$URL_FILE"
           chmod 600 "$URL_FILE"

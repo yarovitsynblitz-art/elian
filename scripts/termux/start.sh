@@ -21,6 +21,17 @@ done < "$ELIAN_ENV_FILE"
 [[ -n "$CALLER_TUNNEL_MODE" ]] && ELIAN_TUNNEL_MODE="$CALLER_TUNNEL_MODE"
 [[ -n "$CALLER_PORT" ]] && ELIAN_PORT="$CALLER_PORT"
 
+FORCE=0
+case "${1:-}" in
+  --force|-f) FORCE=1 ;;
+esac
+
+if server_running && (( FORCE )); then
+  log "перезапуск по требованию (после пересборки) — останавливаю текущий процесс"
+  bash "$SCRIPT_DIR/stop.sh" >/dev/null 2>&1 || true
+  sleep 1
+fi
+
 if server_running; then
   if health_ok; then
     ok "сервер уже работает"
@@ -66,9 +77,13 @@ fi
 
 # Ждём публичный адрес (Quick Tunnel печатает его в лог).
 for _ in $(seq 1 40); do
-  if [[ -s "$ELIAN_HOME/public-url.txt" ]]; then break; fi
+  if [[ -s "$ELIAN_HOME/public-url.txt" ]] && valid_public_url "$(cat "$ELIAN_HOME/public-url.txt")"; then break; fi
   sleep 1
 done
+if [[ -s "$ELIAN_HOME/public-url.txt" ]] && ! valid_public_url "$(cat "$ELIAN_HOME/public-url.txt")"; then
+  warn "в файле адреса оказалось служебное значение — удаляю, ждём настоящий адрес от туннеля"
+  rm -f "$ELIAN_HOME/public-url.txt"
+fi
 URL="$(cat "$ELIAN_HOME/public-url.txt" 2>/dev/null || true)"
 if [[ -n "$URL" ]]; then ok "публичный адрес: $URL"; else warn "адрес ещё не получен: bash scripts/termux/logs.sh tunnel"; fi
 
