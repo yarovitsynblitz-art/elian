@@ -66,6 +66,7 @@ case "$MODE" in
     # Сколько ждём регистрации коннектора, прежде чем сменить транспорт.
     REG_TIMEOUT="${ELIAN_TUNNEL_REG_TIMEOUT:-25}"
     backoff=5
+    PROTO_FAILS=0
     while true; do
       # Файл с прошлым адресом не стираем: пока Cloudflare выдаёт новый, лучше
       # показывать «последний известный», чем пустоту.
@@ -112,6 +113,7 @@ case "$MODE" in
       done
 
       if (( registered == 1 )); then
+        PROTO_FAILS=0
         # Всё хорошо: ждём, пока туннель живёт. Упадёт — супервизор перезапустит.
         wait "$PIPE_PID" 2>/dev/null
         status=$?
@@ -128,9 +130,24 @@ case "$MODE" in
         done
         kill -9 "$PIPE_PID" 2>/dev/null || true
         set -e
+        PROTO_FAILS=$(( PROTO_FAILS + 1 ))
+        if (( PROTO_FAILS == 2 )); then
+          warn "=================================================================="
+          warn "Сеть не пропускает туннель ни по http2 (TCP), ни по quic (UDP 7844)."
+          warn "Обычно это VPN или мобильный оператор. Что сделать:"
+          warn "  1) выключить VPN и подождать минуту;"
+          warn "  2) попробовать другую сеть (Wi-Fi вместо мобильной и наоборот);"
+          warn "  3) прислать мне вывод: elian diag"
+          warn "Пока туннель не поднялся, мессенджер доступен локально: elian local-open"
+          notify "Элиан: туннель не проходит через сеть" "Проверьте VPN или сеть. Локально всё работает: elian local-open"
+          warn "=================================================================="
+        elif (( PROTO_FAILS % 6 == 0 )); then
+          warn "туннель всё ещё не проходит через сеть (попыток: ${PROTO_FAILS}) — elian diag"
+        fi
         if [[ "$PROTOCOL" == "http2" ]]; then PROTOCOL="quic"; else PROTOCOL="http2"; fi
         rm -f "$URL_FILE"
         backoff=5
+        sleep 5
         continue
       fi
 
