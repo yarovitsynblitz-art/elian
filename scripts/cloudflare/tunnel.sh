@@ -26,8 +26,11 @@ PIDFILE="$ELIAN_HOME/tunnel.pid"
 # открываешь ссылку, а Cloudflare отвечает 1033, потому что её коннектор уже мёртв.
 if [[ -f "$PIDFILE" ]]; then
   OTHER_PID="$(cat "$PIDFILE" 2>/dev/null || true)"
-  if [[ -n "$OTHER_PID" && "$OTHER_PID" != "$$" ]] && kill -0 "$OTHER_PID" 2>/dev/null \
-     && ps -p "$OTHER_PID" -o args= 2>/dev/null | grep -q "tunnel.sh"; then
+  PID_AGE=$(( $(date +%s) - $(stat -c %Y "$PIDFILE" 2>/dev/null || date +%s) ))
+  # Свежий pid-файл + живой процесс именно этого скрипта (а не переиспользованный pid).
+  if [[ -n "$OTHER_PID" && "$OTHER_PID" != "$$" ]] && (( PID_AGE < 21600 )) \
+     && kill -0 "$OTHER_PID" 2>/dev/null \
+     && ps -p "$OTHER_PID" -o args= 2>/dev/null | grep -q "cloudflare/tunnel.sh"; then
     warn "туннель уже запущен (pid $OTHER_PID) — второй экземпляр не нужен"
     exit 0
   fi
@@ -59,25 +62,29 @@ case "$MODE" in
     # он поднимается сам, а новый адрес сразу пишется в файл, историю и уведомление.
     PREV_URL="$(cat "$URL_FILE" 2>/dev/null || true)"
     HISTORY_FILE="$ELIAN_HOME/public-url.history"
+    MARK_FILE="$ELIAN_HOME/tunnel.registered"
+    # Сколько ждём регистрации коннектора, прежде чем сменить транспорт.
+    REG_TIMEOUT="${ELIAN_TUNNEL_REG_TIMEOUT:-25}"
     backoff=5
     while true; do
       # Файл с прошлым адресом не стираем: пока Cloudflare выдаёт новый, лучше
-      # показывать «последний известный», чем пустоту (иначе bootstrap и elian url
-      # успевают прочитать пустой файл и пишут «адрес не получен»).
+      # показывать «последний известный», чем пустоту.
       log "запускаю Quick Tunnel → http://127.0.0.1:${ELIAN_PORT} (протокол ${PROTOCOL})"
-      # --url печатает адрес в stderr; вытаскиваем его в файл, лог и уведомление.
+      rm -f "$MARK_FILE"
       # set +e: падение cloudflared — штатная ситуация для супервизора, а не конец скрипта.
       set +e
       "$CLOUDFLARED" tunnel --no-autoupdate --protocol "$PROTOCOL" --url "http://127.0.0.1:${ELIAN_PORT}" 2>&1 | while IFS= read -r line; do
         printf '%s\n' "$line"
+        # Подтверждение, что коннектор реально встал на edge Cloudflare.
+        if [[ "$line" == *"Registered tunnel connection"* ]]; then
+          printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$PROTOCOL" > "$MARK_FILE"
+        fi
+        # Диагностика транспорта: такие ошибки объясняют 1033 лучше любых догадок.
+        if [[ "$line" == *"Failed to dial"* ]]; then
+          warn "не удалось подключиться по ${PROTOCOL}: $(printf '%s' "$line" | sed 's/.*error=//' | cut -c1-90)"
+        fi
         # В логах cloudflared бывают служебные хосты (api.trycloudflare.com и т.п.) —
         # адресом туннеля считаем только настоящий, вида a-b-c.trycloudflare.com.
-        # Диагностика транспорта: такие ошибки объясняют 1033 лучше любых догадок.
-        if [[ "$line" == *"quic"* && ( "$line" == *"Failed to dial"* || "$line" == *"Retrying connection"* ) ]]; then
-          if [[ "$PROTOCOL" == "quic" ]]; then
-            warn "QUIC не проходит (UDP 7844 заблокирован). Переключите транспорт: ELIAN_TUNNEL_PROTOCOL=http2 в ~/.elian/elian.env"
-          fi
-        fi
         if [[ "$line" =~ https://[a-z0-9-]+\.trycloudflare\.com ]] && valid_public_url "${BASH_REMATCH[0]}"; then
           local_url="${BASH_REMATCH[0]}"
           printf '%s\n' "$local_url" > "$URL_FILE"
@@ -92,10 +99,41 @@ case "$MODE" in
             notify "Элиан: адрес изменился" "$local_url"
           fi
         fi
+      done &
+      PIPE_PID=$!
+
+      # Ждём регистрации коннектора. Если сеть режет выбранный транспорт,
+      # через REG_TIMEOUT секунд переключаемся на другой и пробуем снова.
+      registered=0
+      for _ in $(seq 1 "$REG_TIMEOUT"); do
+        if [[ -f "$MARK_FILE" ]]; then registered=1; break; fi
+        kill -0 "$PIPE_PID" 2>/dev/null || break
+        sleep 1
       done
-      status=${PIPESTATUS[0]:-0}
-      set -e
-      warn "туннель завершился (код $status) — перезапуск через ${backoff} с"
+
+      if (( registered == 1 )); then
+        # Всё хорошо: ждём, пока туннель живёт. Упадёт — супервизор перезапустит.
+        wait "$PIPE_PID" 2>/dev/null
+        status=$?
+        set -e
+        warn "туннель завершился (код $status) — перезапуск через ${backoff} с"
+      else
+        # Регистрации нет: значит этот транспорт не проходит через сеть.
+        warn "по ${PROTOCOL} коннектор не поднялся за ${REG_TIMEOUT} с — пробую другой транспорт"
+        pkill -f "cloudflared tunnel" 2>/dev/null || true
+        kill "$PIPE_PID" 2>/dev/null || true
+        for _ in 1 2 3 4 5 6; do
+          kill -0 "$PIPE_PID" 2>/dev/null || break
+          sleep 0.5
+        done
+        kill -9 "$PIPE_PID" 2>/dev/null || true
+        set -e
+        if [[ "$PROTOCOL" == "http2" ]]; then PROTOCOL="quic"; else PROTOCOL="http2"; fi
+        rm -f "$URL_FILE"
+        backoff=5
+        continue
+      fi
+
       sleep "$backoff"
       PREV_URL="$(cat "$URL_FILE" 2>/dev/null || printf '%s' "$PREV_URL")"
       # Постепенно увеличиваем паузу, чтобы не долбить Cloudflare при сбоях сети.
